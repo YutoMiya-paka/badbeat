@@ -1,0 +1,1038 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>バッドビート相談所</title>
+<meta name="description" content="負けたポーカーのハンドを入れると、オールイン時点の勝率を全通り数えて計算し、本当にバッドビートだったかを判定するチャット。">
+<meta property="og:title" content="バッドビート相談所">
+<meta property="og:description" content="その負け、本当にバッドビート？ オールイン時点の勝率を全通り数えて判定する。">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<meta name="theme-color" content="#0E5A43">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%23C23A2B'/%3E%3Ccircle cx='16' cy='16' r='10' fill='none' stroke='%23fff' stroke-width='3' stroke-dasharray='5 4'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%230E5A43'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=JetBrains+Mono:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
+<style>
+  :root {
+    --bg: #E9EFEB;
+    --surface: #FFFFFF;
+    --ink: #15201B;
+    --muted: #5A6B62;
+    --line: #D3DDD7;
+    --felt: #0E5A43;
+    --felt-2: #0A4735;
+    --on-felt: #F4FAF6;
+    --chip: #C23A2B;
+    --gold: #A87A12;
+    --blue: #2B5CAE;
+    --flat: #6B7770;
+    --tie: #B9C4BE;
+    --me: #0E5A43;
+    --on-me: #F4FAF6;
+    --hero: #0E5A43;
+    --hero-ink: #0E5A43;
+    --ring: #0E5A43;
+    --card: #FFFFFF;
+    --card-line: #C9D1CC;
+    --s0: #1B1F1D;
+    --s1: #CC2B2B;
+    --s2: #1F5FC4;
+    --s3: #1E7A3C;
+    --display: "Dela Gothic One", "Hiragino Sans", "Yu Gothic", sans-serif;
+    --body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+        color-scheme: dark;
+      --bg: #0B1310;
+      --surface: #14211B;
+      --ink: #E6EEE9;
+      --muted: #92A59A;
+      --line: #25362E;
+      --felt: #0F3F30;
+      --felt-2: #0B3226;
+      --on-felt: #E6F2EB;
+      --chip: #E8604F;
+      --gold: #D9AE45;
+      --blue: #78A2EA;
+      --flat: #9AA89F;
+      --tie: #4A5A52;
+      --me: #1F7A5B;
+      --on-me: #F2FAF5;
+      --hero: #2E9A74;
+      --hero-ink: #E6EEE9;
+      --ring: #D9AE45;
+      --card: #F3F4EF;
+      --card-line: #3A4A42;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0B1310;
+    --surface: #14211B;
+    --ink: #E6EEE9;
+    --muted: #92A59A;
+    --line: #25362E;
+    --felt: #0F3F30;
+    --felt-2: #0B3226;
+    --on-felt: #E6F2EB;
+    --chip: #E8604F;
+    --gold: #D9AE45;
+    --blue: #78A2EA;
+    --flat: #9AA89F;
+    --tie: #4A5A52;
+    --me: #1F7A5B;
+    --on-me: #F2FAF5;
+    --hero: #2E9A74;
+    --hero-ink: #E6EEE9;
+    --ring: #D9AE45;
+    --card: #F3F4EF;
+    --card-line: #3A4A42;
+  }
+
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 15px;
+    line-height: 1.65;
+  }
+  .app {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+
+  /* ヘッダー：卓のフェルト */
+  .top {
+    background: var(--felt);
+    color: var(--on-felt);
+    padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 3px solid var(--felt-2);
+  }
+  .top-text { flex: 1; min-width: 0; }
+  .about-btn {
+    flex: none;
+    font: inherit; font-size: 12px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--on-felt) 45%, transparent);
+    background: transparent;
+    color: var(--on-felt);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  /* このページについて */
+  .about {
+    width: min(560px, calc(100% - 32px));
+    max-height: calc(100% - 48px);
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--ink);
+  }
+  .about::backdrop { background: rgb(0 0 0 / .45); }
+  .about-inner { padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 14px; }
+  .about h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 18px; }
+  .about h3 { margin: 0 0 4px; font-size: 13px; letter-spacing: .06em; color: var(--muted); }
+  .about p, .about ul { margin: 0; font-size: 14px; }
+  .about ul { padding-left: 1.2em; }
+  .about a { color: var(--blue); }
+  .about-close { align-self: flex-end; }
+  .top-chip {
+    flex: none;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background:
+      repeating-conic-gradient(var(--on-felt) 0 15deg, var(--chip) 15deg 45deg);
+    box-shadow: inset 0 0 0 5px var(--chip), inset 0 0 0 7px var(--on-felt);
+  }
+  .top h1 {
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 20px;
+    line-height: 1.2;
+    letter-spacing: .02em;
+  }
+  .top p { margin: 2px 0 0; font-size: 12px; opacity: .8; }
+
+  /* 会話ログ */
+  .log {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    scroll-behavior: smooth;
+  }
+  @media (prefers-reduced-motion: reduce) { .log { scroll-behavior: auto; } }
+  .row { display: flex; gap: 8px; align-items: flex-end; }
+  .row.me { justify-content: flex-end; }
+  .avatar {
+    flex: none;
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: var(--felt);
+    color: var(--on-felt);
+    font-family: var(--display);
+    font-size: 13px;
+    display: grid; place-items: center;
+  }
+  .bubble {
+    max-width: min(560px, 86%);
+    padding: 10px 14px;
+    border-radius: 16px;
+    overflow-wrap: anywhere;
+  }
+  .row.bot .bubble {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-bottom-left-radius: 4px;
+  }
+  .row.me .bubble {
+    background: var(--me);
+    color: var(--on-me);
+    border-bottom-right-radius: 4px;
+    white-space: pre-wrap;
+  }
+  .bubble p { margin: 0; }
+  .bubble p + p { margin-top: 6px; }
+  .sample-tag {
+    align-self: center;
+    font-size: 11px;
+    letter-spacing: .12em;
+    color: var(--muted);
+    border: 1px dashed var(--line);
+    border-radius: 999px;
+    padding: 2px 10px;
+  }
+
+  /* 判定カード */
+  .verdict { display: flex; flex-direction: column; gap: 10px; }
+  .v-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .v-chip {
+    font-size: 11px; font-weight: 700; letter-spacing: .1em;
+    padding: 2px 8px; border-radius: 4px;
+    color: var(--surface);
+    background: var(--c, var(--flat));
+  }
+  .v-title {
+    font-family: var(--display);
+    font-size: 22px;
+    line-height: 1.25;
+    color: var(--c, var(--ink));
+    text-wrap: balance;
+  }
+  .v-line { font-size: 16px; font-weight: 700; line-height: 1.6; }
+  .hands {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 6px 10px;
+    align-items: center;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .cards { display: flex; gap: 4px; flex-wrap: wrap; }
+  .pc {
+    display: inline-flex; align-items: baseline; gap: 1px;
+    font-family: var(--mono); font-weight: 700; font-size: 14px;
+    line-height: 1;
+    padding: 5px 5px 4px;
+    min-width: 26px; justify-content: center;
+    background: var(--card);
+    border: 1px solid var(--card-line);
+    border-radius: 4px;
+  }
+  .pc i { font-style: normal; font-size: 12px; }
+  .pc.s0 { color: var(--s0); } .pc.s1 { color: var(--s1); }
+  .pc.s2 { color: var(--s2); } .pc.s3 { color: var(--s3); }
+  .pc.dim { opacity: .45; }
+  .gap { width: 6px; }
+
+  .eq { display: flex; flex-direction: column; gap: 4px; }
+  .eq-label { font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+  .bar {
+    display: flex; height: 12px; border-radius: 3px; overflow: hidden;
+    background: var(--tie);
+  }
+  .bar .h { background: var(--hero); }
+  .bar .t { background: var(--tie); }
+  .bar .v { background: var(--chip); }
+  .eq-nums {
+    display: flex; justify-content: space-between; gap: 8px;
+    font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums;
+  }
+  .eq-nums .hn { color: var(--hero-ink); font-weight: 700; }
+  .eq-nums .vn { color: var(--chip); font-weight: 700; }
+
+  .tl { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); padding-top: 10px; }
+  .tl-row {
+    display: grid;
+    grid-template-columns: 4.2em max-content 1fr 3.6em;
+    gap: 8px; align-items: center;
+    font-size: 12px;
+  }
+  .tl-row .st { color: var(--muted); white-space: nowrap; }
+  .tl-row .cards { flex-wrap: nowrap; gap: 2px; }
+  .tl-row .pc { font-size: 12px; min-width: 22px; padding: 4px 3px 3px; }
+  .tl-row .num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; font-size: 12px; }
+  .tl-row .mini { height: 6px; background: var(--chip); border-radius: 2px; overflow: hidden; }
+  .tl-row .mini span { display: block; height: 100%; background: var(--hero); }
+  .tl-row.flip .st, .tl-row.flip .num { color: var(--chip); font-weight: 700; }
+
+  .facts { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+  .facts b { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .note { font-size: 12px; color: var(--muted); }
+  .trivia {
+    font-size: 12px; color: var(--muted);
+    border-left: 3px solid var(--line);
+    padding-left: 8px;
+  }
+
+  .examples { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .ex {
+    font: inherit; font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .ex:hover { border-color: var(--felt); }
+  code {
+    font-family: var(--mono); font-size: 12.5px;
+    background: var(--bg); padding: 1px 5px; border-radius: 3px;
+  }
+
+  .typing { display: inline-flex; gap: 8px; align-items: center; color: var(--muted); font-size: 13px; }
+  .typing .dots { display: inline-flex; gap: 3px; }
+  .typing .dots span {
+    width: 5px; height: 5px; border-radius: 50%; background: var(--muted);
+    animation: blink 1s infinite;
+  }
+  .typing .dots span:nth-child(2) { animation-delay: .15s; }
+  .typing .dots span:nth-child(3) { animation-delay: .3s; }
+  @keyframes blink { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .typing .dots span { animation: none; opacity: .6; } }
+
+  /* カード選択パネル */
+  .picker {
+    border-top: 1px solid var(--line);
+    background: var(--surface);
+    padding: 12px 16px;
+    display: flex; flex-direction: column; gap: 10px;
+    max-height: 60vh; overflow-y: auto;
+  }
+  .pk-slots { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+  .pk-group { display: flex; align-items: center; gap: 4px; }
+  .pk-label { font-size: 11px; color: var(--muted); margin-right: 2px; letter-spacing: .08em; }
+  .slot {
+    width: 34px; height: 42px;
+    border-radius: 5px;
+    border: 1px dashed var(--card-line);
+    background: var(--bg);
+    font-family: var(--mono); font-weight: 700; font-size: 14px;
+    line-height: 1.05;
+    cursor: pointer;
+    padding: 0;
+    color: var(--muted);
+  }
+  .slot.filled { border-style: solid; background: var(--card); }
+  .slot.s0 { color: var(--s0); } .slot.s1 { color: var(--s1); }
+  .slot.s2 { color: var(--s2); } .slot.s3 { color: var(--s3); }
+  .slot.active { outline: 2px solid var(--ring); outline-offset: 1px; }
+  .pk-street { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .seg button {
+    font: inherit; font-size: 13px;
+    padding: 5px 12px;
+    border: 0; background: transparent; color: var(--ink);
+    cursor: pointer;
+  }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-checked="true"] { background: var(--felt); color: var(--on-felt); }
+  .pk-ranks { display: grid; grid-template-columns: repeat(13, minmax(0, 1fr)); gap: 4px; }
+  .pk-suits { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .key {
+    font-family: var(--mono); font-weight: 700; font-size: 15px;
+    padding: 8px 0;
+    border-radius: 5px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .key[aria-pressed="true"] { background: var(--felt); color: var(--on-felt); border-color: var(--felt); }
+  .key:disabled { opacity: .3; cursor: default; }
+  .key.s0 { color: var(--s0); } .key.s1 { color: var(--s1); }
+  .key.s2 { color: var(--s2); } .key.s3 { color: var(--s3); }
+  .pk-suits .key { font-size: 20px; background: var(--card); }
+  .pk-actions { display: flex; align-items: center; gap: 10px; }
+  .pk-error { flex: 1; font-size: 12px; color: var(--chip); }
+
+  /* 入力欄 */
+  .composer {
+    display: flex; gap: 8px; align-items: center;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .composer input {
+    flex: 1; min-width: 0;
+    font: inherit; font-size: 16px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    color: var(--ink);
+  }
+  .btn {
+    font: inherit; font-weight: 700; font-size: 14px;
+    padding: 9px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--me);
+    background: var(--me);
+    color: var(--on-me);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn.ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+  .btn.ghost[aria-expanded="true"] { border-color: var(--felt); }
+  .btn:disabled { opacity: .5; cursor: default; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  @media (max-width: 420px) {
+    .v-title { font-size: 20px; }
+    .tl-row { gap: 6px; }
+    .key { font-size: 13px; padding: 7px 0; }
+    .pk-ranks { gap: 3px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="top-chip" aria-hidden="true"></div>
+    <div class="top-text">
+      <h1>バッドビート相談所</h1>
+      <p>負けたハンドを書けば、おやっさんが確率だけで判定する</p>
+    </div>
+    <button type="button" class="about-btn" id="aboutOpen" aria-haspopup="dialog">このページについて</button>
+  </header>
+
+  <dialog class="about" id="about" aria-labelledby="aboutTitle">
+    <div class="about-inner">
+      <h2 id="aboutTitle">このページについて</h2>
+      <section>
+        <h3>計算の前提</h3>
+        <ul>
+          <li>入力されたカードとオールインした場面から、残りのボードを全通り数えて勝率を出しています。</li>
+          <li>判定するのは確率だけです。プレイが正しかったかどうかは判定しません。</li>
+          <li>スートが書かれていないときは、なるべく同じスートが重ならないように自動で割り振ります。</li>
+        </ul>
+      </section>
+      <section>
+        <h3>口調について</h3>
+        <p>「おやっさん」の荒っぽい口調はキャラクターの演出です。</p>
+      </section>
+      <section>
+        <h3>賭けについて</h3>
+        <p>このページは賭けやギャンブルを勧めるものではありません。</p>
+      </section>
+      <section>
+        <h3>入力の記録（プライバシー）</h3>
+        <ul>
+          <li id="aboutLogOn">入力は、読み取りの改善と統計のために保存します（入力した文章・カード・判定結果）。名前や端末の情報は送りません。</li>
+          <li>入力欄に名前などの個人情報は書かないでください。</li>
+          <li>文字の表示に Google Fonts を使っているため、Google のサーバーへの通信があります。</li>
+        </ul>
+      </section>
+      <section id="aboutFeedback" hidden>
+        <h3>ご意見・不具合の連絡</h3>
+        <p><a id="feedbackLink" href="#" target="_blank" rel="noopener">こちらから送れます</a></p>
+      </section>
+      <button type="button" class="btn about-close" id="aboutClose">閉じる</button>
+    </div>
+  </dialog>
+
+  <main id="log" class="log" aria-live="polite"></main>
+
+  <section id="picker" class="picker" hidden aria-label="カードで入力">
+    <div class="pk-slots" id="pkSlots">
+      <div class="pk-group"><span class="pk-label">自分</span>
+        <button type="button" class="slot" id="slot-h0" data-slot="h0" aria-label="自分 1枚目"></button>
+        <button type="button" class="slot" id="slot-h1" data-slot="h1" aria-label="自分 2枚目"></button>
+      </div>
+      <div class="pk-group"><span class="pk-label">相手</span>
+        <button type="button" class="slot" id="slot-v0" data-slot="v0" aria-label="相手 1枚目"></button>
+        <button type="button" class="slot" id="slot-v1" data-slot="v1" aria-label="相手 2枚目"></button>
+      </div>
+      <div class="pk-group"><span class="pk-label">ボード</span>
+        <button type="button" class="slot" id="slot-b0" data-slot="b0" aria-label="フロップ 1枚目"></button>
+        <button type="button" class="slot" id="slot-b1" data-slot="b1" aria-label="フロップ 2枚目"></button>
+        <button type="button" class="slot" id="slot-b2" data-slot="b2" aria-label="フロップ 3枚目"></button>
+        <button type="button" class="slot" id="slot-b3" data-slot="b3" aria-label="ターン"></button>
+        <button type="button" class="slot" id="slot-b4" data-slot="b4" aria-label="リバー"></button>
+      </div>
+    </div>
+    <div class="pk-street">
+      <span>オールインしたのは</span>
+      <div class="seg" role="radiogroup" aria-label="オールインした場面" id="pkStreet">
+        <button type="button" role="radio" id="st-0" data-street="0" aria-checked="true">プリフロ</button>
+        <button type="button" role="radio" id="st-3" data-street="3" aria-checked="false">フロップ</button>
+        <button type="button" role="radio" id="st-4" data-street="4" aria-checked="false">ターン</button>
+      </div>
+    </div>
+    <div class="pk-ranks" id="pkRanks"></div>
+    <div class="pk-suits" id="pkSuits"></div>
+    <div class="pk-actions">
+      <button type="button" class="btn ghost" id="pkClear">クリア</button>
+      <span class="pk-error" id="pkError" role="status"></span>
+      <button type="button" class="btn" id="pkJudge">判定する</button>
+    </div>
+  </section>
+
+  <form id="composer" class="composer" autocomplete="off">
+    <button type="button" class="btn ghost" id="pickerToggle" aria-expanded="false" aria-controls="picker">カード</button>
+    <input id="msg" type="text" enterkeyhint="send" placeholder="例: AA vs KK、プリフロでオールイン" aria-label="負けたハンドを書く">
+    <button type="submit" class="btn" id="send">送信</button>
+  </form>
+</div>
+
+<script src="engine.js"></script>
+<script>
+(function () {
+  'use strict';
+  // ---------- 設定 ----------
+  var CONFIG = {
+    APP_VERSION: '1.1.0',
+    LOG_ENDPOINT: '',   // Apps Script ウェブアプリの /exec URL。空なら記録を送らない
+    FEEDBACK_URL: '',   // ご意見の送り先（フォームなどの URL）。空なら表示しない
+    LOG_LIMIT: 50       // 1 タブあたりの送信上限
+  };
+
+  var PE = window.PokerEngine;
+  var log = document.getElementById('log');
+  var input = document.getElementById('msg');
+  var sendBtn = document.getElementById('send');
+  var busy = false;
+
+  // ---------- 表示の部品 ----------
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function rankLabel(r) { var ch = PE.RANKS[r]; return ch === 'T' ? '10' : ch; }
+  function cardHTML(c, dim) {
+    var s = PE.suitOf(c);
+    return '<span class="pc s' + s + (dim ? ' dim' : '') + '"><b>' + rankLabel(PE.rankOf(c)) + '</b><i>' + PE.SUIT_SYM[s] + '</i></span>';
+  }
+  function cardsHTML(list, dimFrom) {
+    return list.map(function (c, i) {
+      var gap = (i === 3 || i === 4) ? '<span class="gap"></span>' : '';
+      return gap + cardHTML(c, dimFrom !== undefined && i >= dimFrom);
+    }).join('');
+  }
+  function cardText(c) { return rankLabel(PE.rankOf(c)) + PE.SUIT_SYM[PE.suitOf(c)]; }
+  function pct(x) {
+    var v = x * 100;
+    if (v > 0 && v < 0.1) return '0.1%未満';
+    return v.toFixed(1) + '%';
+  }
+  function odds(p) {
+    if (p <= 0) return null;
+    var v = 1 / p;
+    return v < 10 ? (Math.round(v * 10) / 10).toString() : Math.round(v).toString();
+  }
+  function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
+  function fill(tpl, d) { return tpl.replace(/\{(\w+)\}/g, function (_, k) { return d[k]; }); }
+
+  function scrollEnd() { log.scrollTop = log.scrollHeight; }
+  function addRow(who, html) {
+    var row = document.createElement('div');
+    row.className = 'row ' + who;
+    row.innerHTML = (who === 'bot' ? '<div class="avatar" aria-hidden="true">親</div>' : '') +
+      '<div class="bubble">' + html + '</div>';
+    log.appendChild(row);
+    scrollEnd();
+    return row;
+  }
+  function addUser(text) { return addRow('me', esc(text)); }
+  function addBot(html) { return addRow('bot', html); }
+  function addTag(text) {
+    var t = document.createElement('div');
+    t.className = 'sample-tag';
+    t.textContent = text;
+    log.appendChild(t);
+  }
+
+  // ---------- 判定とセリフ（おやっさん） ----------
+  var LINES = {
+    real: [
+      '{E}で負けた？　……それは泣いていい。{odds}回に1回しか起きないことが、よりによって今起きた。お前は悪くない。',
+      '{E}で金を入れて負けたなら、それは本物のバッドビートだ。プレイは完璧。悪いのはカードの神様だ。',
+      '数字は見た。{odds}回に1回の事故だ。今日はもう帰って、温かいもん食って寝ろ。'
+    ],
+    bad: [
+      '{E}で入って負けた。これはバッドビートだ。{odds}回に1回はこうなる。お前の判断は正しかった。',
+      '有利なときに金を入れた時点で、お前の仕事は終わってる。{odds}回に1回の方を引いただけだ。切り替えろ。',
+      'それはバッドビートって呼んでいい。{V}に刺されただけだ。次も同じように入れろ。'
+    ],
+    usual: [
+      '{E}は有利だけど、{odds}回に1回は負ける勝負だ。よくある負けだな。気にすんな。',
+      'まあ有利ではあった。ただ、{V}も負け筋がある勝負をバッドビートと呼ぶのはちょっと大げさだ。',
+      '{E}なら勝つ方が多い。でも毎回勝てるほどじゃない。これはただの「よくある負け」だ。'
+    ],
+    flip: [
+      '勝率{E}。ほぼ五分だ。コインの裏が出ただけで、バッドビートじゃねえ。',
+      'コインフリップで負けたくらいで泣くな。2回に1回は負けるやつだ。次は表が出る。',
+      '{E}対{V}。これを「引かれた」って言うのは無理がある。ただの五分の勝負だ。'
+    ],
+    cooler: [
+      'クーラーだな。お前の手も強かったが、相手がもっと強かった。これは降りられない。バッドビートじゃねえが、運が悪かっただけだ。',
+      '勝率{E}。最初から負けてはいたが、その手で降りるのは無理だ。クーラーってやつだ。忘れろ。'
+    ],
+    sekkyo: [
+      'おい。勝率{E}で突っ込んどいてバッドビートとか、なめたこと言ってんじゃねえ。負けて当然だ。',
+      '寝言は寝て言え。{V}で相手が勝つ勝負だぞ。お前が引かれたんじゃない、お前が引けなかっただけだ。',
+      'それはバッドビートじゃなくて、ただの順当な負けだ。バッドビートって言葉を安売りすんな。',
+      '計算してやった。お前の勝率は{E}。……で、何が不運だって？　反省会から始めろ。'
+    ],
+    dead: [
+      '勝率{E}。お前、オールインの時点でほぼ死んでたぞ。バッドビートどころか、自分から崖に飛び込んでる。',
+      '{E}で何を期待してたんだ。宝くじ買って外れたって文句言うのと同じだ。帰れ。'
+    ]
+  };
+  var VERDICT = {
+    real:   { title: '本物のバッドビート', chip: '同情', color: 'var(--gold)' },
+    bad:    { title: 'バッドビート',       chip: '同情', color: 'var(--gold)' },
+    usual:  { title: 'よくある負け',       chip: '普通', color: 'var(--felt)' },
+    flip:   { title: 'コインフリップ',     chip: '五分', color: 'var(--flat)' },
+    cooler: { title: 'クーラー',           chip: '不運', color: 'var(--blue)' },
+    sekkyo: { title: 'バッドビートじゃねえ', chip: '説教', color: 'var(--chip)' },
+    dead:   { title: 'バッドビートじゃねえ', chip: '説教', color: 'var(--chip)' },
+    won:    { title: '勝ってるじゃねえか', chip: '確認', color: 'var(--flat)' },
+    chop:   { title: 'チョップ（引き分け）', chip: '確認', color: 'var(--flat)' }
+  };
+
+  function isStrongPreflop(hero) {
+    var r1 = PE.rankOf(hero[0]), r2 = PE.rankOf(hero[1]);
+    if (r1 === r2) return r1 >= 8; // TT 以上
+    return Math.min(r1, r2) === 11 && Math.max(r1, r2) === 12; // AK
+  }
+  function classify(res) {
+    if (res.final && res.final.result === 'win') return 'won';
+    if (res.final && res.final.result === 'tie') return 'chop';
+    var a = res.allin, E = a.win + a.tie / 2;
+    if (E >= 0.9) return 'real';
+    if (E >= 0.75) return 'bad';
+    if (E >= 0.55) return 'usual';
+    if (E >= 0.45) return 'flip';
+    var strong = res.spec.street === 0 ? isStrongPreflop(res.spec.hero) : res.heroCatAtAllin >= 2;
+    if (strong && E >= 0.08) return 'cooler';
+    if (E < 0.08) return 'dead';
+    return 'sekkyo';
+  }
+
+  var TRIVIA = {
+    favorite: [
+      '80%の勝負を5回続けて全部勝てる確率は、約33%しかない。',
+      '90%の勝負でも、10回やれば1回は負ける。それがポーカーだ。',
+      'ペア同士のオールインは、大きい方が約80%勝つ。つまり5回に1回はひっくり返る。',
+      '残り1枚しかない札を、ターンかリバーで引かれる確率は約4.3%。'
+    ],
+    flip: [
+      'ポケットペア対オーバーカード2枚は、だいたい55%対45%。',
+      'コインフリップを5回連続で負ける確率は約3%。そっちの方がよっぽど不運だ。'
+    ],
+    under: [
+      'フロップのフラッシュドローがリバーまでに完成する確率は約35%。',
+      'フロップの両面待ちストレートドローがリバーまでに完成する確率は約31.5%。',
+      'ポケットペアがフロップでセットになる確率は約11.8%（8.5回に1回）。',
+      'AAが配られるのは221回に1回（約0.45%）。'
+    ]
+  };
+
+  function eqBlock(step, label) {
+    var h = step.win * 100, t = step.tie * 100, v = step.lose * 100;
+    return '<div class="eq">' +
+      '<div class="eq-label"><span>' + label + '</span><span>' + step.boards.toLocaleString() + '通りを計算</span></div>' +
+      '<div class="bar" role="img" aria-label="自分 ' + pct(step.win) + '、相手 ' + pct(step.lose) + '">' +
+        '<span class="h" style="width:' + h + '%"></span><span class="t" style="width:' + t + '%"></span><span class="v" style="width:' + v + '%"></span></div>' +
+      '<div class="eq-nums"><span class="hn">自分 ' + pct(step.win) + '</span>' +
+        (step.tie > 0.0005 ? '<span>引き分け ' + pct(step.tie) + '</span>' : '') +
+        '<span class="vn">相手 ' + pct(step.lose) + '</span></div></div>';
+  }
+
+  var SHORT = { 0: 'プリフロ', 3: 'フロップ', 4: 'ターン' };
+  function timelineBlock(res) {
+    var b = res.spec.board, rows = [];
+    var dealt = { 0: [], 3: b.slice(0, 3), 4: b.slice(3, 4) };
+    var prevE = null;
+    res.steps.forEach(function (s) {
+      var E = s.win + s.tie / 2;
+      var flip = prevE !== null && prevE > 0.5 && E < 0.5;
+      rows.push({ st: SHORT[s.street], cards: dealt[s.street], E: E, flip: flip });
+      prevE = E;
+    });
+    if (res.final) {
+      var fE = res.final.result === 'win' ? 1 : res.final.result === 'tie' ? 0.5 : 0;
+      rows.push({ st: 'リバー', cards: b.slice(4, 5), E: fE, flip: prevE !== null && prevE > 0.5 && fE < 0.5,
+        label: res.final.result === 'win' ? '勝ち' : res.final.result === 'tie' ? '分け' : '負け' });
+    }
+    if (rows.length < 2) return '';
+    return '<div class="tl" aria-label="ストリートごとの勝率">' + rows.map(function (r) {
+      return '<div class="tl-row' + (r.flip ? ' flip' : '') + '"><span class="st">' + r.st + '</span>' +
+        '<span class="cards">' + r.cards.map(function (c) { return cardHTML(c); }).join('') + '</span>' +
+        '<span class="mini"><span style="width:' + (r.E * 100) + '%"></span></span>' +
+        '<span class="num">' + (r.label || pct(r.E)) + '</span></div>';
+    }).join('') + '</div>';
+  }
+
+  function factsBlock(res, key) {
+    var out = [], a = res.allin;
+    var o = odds(a.lose);
+    if (key !== 'won' && key !== 'chop') {
+      var heroE = a.win + a.tie / 2;
+      if (a.lose >= 0.5) {
+        var ho = odds(heroE);
+        out.push(ho ? 'お前が勝てるのは <b>' + ho + '回に1回</b>（' + pct(heroE) + '）。負ける方が普通だ' : 'お前が勝てる札は1枚もなかった');
+      } else {
+        out.push(o ? '相手が勝つのは <b>' + o + '回に1回</b>（' + pct(a.lose) + '）' : '相手が勝つ可能性はなかった');
+      }
+    }
+    // 逆転されたストリート
+    var steps = res.steps.slice();
+    for (var i = 1; i < steps.length; i++) {
+      var p = steps[i - 1], s = steps[i];
+      if (p.win + p.tie / 2 > 0.5 && s.win + s.tie / 2 < 0.5) {
+        out.push(PE.STREET_NAMES[s.street] + 'で逆転された。直前のお前の勝率は <b>' + pct(p.win + p.tie / 2) + '</b>');
+      }
+    }
+    // リバーの一撃
+    if (res.river && res.final && res.final.result === 'lose') {
+      var turn = res.steps.filter(function (s) { return s.street === 4; })[0];
+      if (turn && turn.win + turn.tie / 2 > 0.5) {
+        var r = res.river, n = r.villWins.length;
+        var list = r.villWins.slice(0, 12).map(cardText).join(' ') + (n > 12 ? ' ほか' : '');
+        out.push('ターンの時点で相手を救う札は <b>残り' + r.total + '枚中' + n + '枚</b>（' + list + '）。リバーで引かれる確率 <b>' + pct(n / r.total) + '</b>');
+      }
+    }
+    if (res.final && key !== 'won' && key !== 'chop') {
+      out.push('最後の役：お前は' + PE.CAT_NAMES[res.final.heroCat] + '、相手は' + PE.CAT_NAMES[res.final.villCat]);
+    }
+    return out.length ? '<div class="facts">' + out.map(function (x) { return '<span>' + x + '</span>'; }).join('') + '</div>' : '';
+  }
+
+  function verdictHTML(res, parsed) {
+    var key = classify(res), v = VERDICT[key], a = res.allin;
+    var E = a.win + a.tie / 2;
+    var d = { E: pct(E), V: pct(a.lose), odds: odds(a.lose) || '∞' };
+    var line;
+    if (key === 'won') line = '……って、そのボードだとお前が勝ってるじゃねえか。カードを見直せ。';
+    else if (key === 'chop') line = 'そのボードだと引き分けだ。負けてねえよ。';
+    else line = fill(pick(LINES[key]), d);
+
+    var triviaPool = E >= 0.55 ? TRIVIA.favorite : E >= 0.45 ? TRIVIA.flip : TRIVIA.under;
+    var notes = [];
+    if (parsed.autoSuits) notes.push('スートが書かれてなかったので、こっちで割り振った。');
+    if (parsed.streetGuessed && res.spec.board.length) notes.push('オールインした場面が書かれてなかったので、プリフロップとして計算した。');
+    if (!res.final && key !== 'won') notes.push('ボードが最後まで書かれてないので、負けた前提で判定した。');
+
+    var s = res.spec;
+    return '<div class="verdict" style="--c:' + v.color + '">' +
+      '<div class="v-head"><span class="v-chip">' + v.chip + '</span><span class="v-title">' + v.title + '</span></div>' +
+      '<div class="hands">' +
+        '<span>自分</span><span class="cards">' + cardsHTML(s.hero) + '</span>' +
+        '<span>相手</span><span class="cards">' + cardsHTML(s.vill) + '</span>' +
+        (s.board.length ? '<span>ボード</span><span class="cards">' + cardsHTML(s.board, s.street || undefined) + '</span>' : '') +
+      '</div>' +
+      eqBlock(a, PE.STREET_NAMES[s.street] + 'でオールインした時点') +
+      '<p class="v-line">' + line + '</p>' +
+      factsBlock(res, key) +
+      timelineBlock(res) +
+      '<p class="trivia">' + pick(triviaPool) + '</p>' +
+      (notes.length ? '<p class="note">' + notes.join('<br>') + '</p>' : '') +
+      '</div>';
+  }
+
+  // ---------- 記録（読み取り改善と統計用。失敗しても画面には影響させない） ----------
+  var logCount = 0;
+  function cardsStr(list) { return (list || []).map(PE.cardStr).join(''); }
+  function sendLog(entry) {
+    if (!CONFIG.LOG_ENDPOINT || logCount >= CONFIG.LOG_LIMIT) return;
+    logCount++;
+    var p = entry.parsed || {};
+    var payload = {
+      v: CONFIG.APP_VERSION,
+      source: entry.source,
+      ok: !!entry.ok,
+      error: entry.error || '',
+      text: String(entry.text || '').slice(0, 100),
+      hero: cardsStr(p.hero),
+      vill: cardsStr(p.vill),
+      board: cardsStr(p.board),
+      street: typeof p.street === 'number' ? p.street : null,
+      autoSuits: !!p.autoSuits,
+      streetGuessed: !!p.streetGuessed,
+      verdict: entry.verdict || '',
+      equity: typeof entry.equity === 'number' ? Math.round(entry.equity * 10000) / 10000 : null,
+      result: entry.result || ''
+    };
+    try {
+      fetch(CONFIG.LOG_ENDPOINT, {
+        method: 'POST', mode: 'no-cors', keepalive: true,
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      }).catch(function () {});
+    } catch (e) {}
+  }
+
+  // ---------- 実行 ----------
+  function setBusy(b) {
+    busy = b;
+    sendBtn.disabled = b;
+    document.getElementById('pkJudge').disabled = b;
+  }
+
+  // meta = { source: 'text'|'picker'|'example', text, log: false で記録しない }
+  async function judge(parsed, meta) {
+    meta = meta || {};
+    setBusy(true);
+    var wait = addBot('<span class="typing"><span class="dots"><span></span><span></span><span></span></span><span class="pg">計算中</span></span>');
+    var pg = wait.querySelector('.pg');
+    try {
+      var res = await PE.analyze(parsed, function (f) { pg.textContent = '全部のボードを数えてる… ' + Math.round(f * 100) + '%'; });
+      wait.querySelector('.bubble').innerHTML = verdictHTML(res, parsed);
+      if (meta.log !== false) {
+        sendLog({
+          source: meta.source, text: meta.text, ok: true, parsed: parsed,
+          verdict: classify(res), equity: res.allin.win + res.allin.tie / 2,
+          result: res.final ? res.final.result : ''
+        });
+      }
+    } catch (e) {
+      wait.querySelector('.bubble').innerHTML = '<p>計算中に止まった。もう一回送ってくれ。</p>';
+      if (meta.log !== false) sendLog({ source: meta.source, text: meta.text, ok: false, error: 'calc_failed', parsed: parsed });
+    }
+    scrollEnd();
+    setBusy(false);
+  }
+
+  var HELP_HTML =
+    '<p>負けたハンドを書いてくれ。確率だけで判定する。</p>' +
+    '<p>書き方：自分の手札 → 相手の手札 → ボードの順。スートは s h d c（♠♥♦♣でもいい）。<code>AhAs vs KdKc</code> のように書く。スートを省いて <code>AA vs KK</code> や <code>AKo</code> <code>AKs</code> でもいい。</p>' +
+    '<p>フロップやターンでオールインしたなら「フロップでオールイン」と書いて、そのときのボードも入れてくれ。下の「カード」ボタンから選んでもいい。</p>';
+  var EXAMPLES = [
+    'AhAs vs KdKc プリフロでオールイン Qh 7c 2d Ks 9s',
+    '72o vs AA',
+    'AhKh vs QsQd フロップでオールイン Qc 8h 3h 2s 9d',
+    'キングスがエーシーズに負けた',
+    'AK vs QQ',
+    'JsTs vs AcKd ターンでオールイン Qs 9d 2c 3h 4d'
+  ];
+  function helpBubble(intro) {
+    var row = addBot((intro ? '<p>' + intro + '</p>' : '') + HELP_HTML +
+      '<div class="examples">' + EXAMPLES.map(function (x, i) {
+        return '<button type="button" class="ex" data-ex="' + i + '">' + esc(x) + '</button>';
+      }).join('') + '</div>');
+    row.querySelectorAll('.ex').forEach(function (b) {
+      b.addEventListener('click', function () { submitText(EXAMPLES[+b.dataset.ex], 'example'); });
+    });
+  }
+
+  function submitText(text, source) {
+    text = text.trim();
+    if (!text || busy) return;
+    source = source || 'text';
+    addUser(text);
+    var parsed = PE.parse(text);
+    if (parsed.error) {
+      sendLog({ source: source, text: text, ok: false, error: parsed.error });
+      if (parsed.error === 'none') {
+        if (/回|今日|一日|1日/.test(text)) {
+          addBot('<p>1日まとめての相談は、まだ準備中だ。今は1ハンドずつ持ってきてくれ。</p>');
+        } else {
+          helpBubble('カードが読み取れなかった。');
+        }
+      } else {
+        addBot('<p>' + esc(parsed.error) + '</p>');
+      }
+      return;
+    }
+    judge(parsed, { source: source, text: text });
+  }
+
+  document.getElementById('composer').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var t = input.value;
+    if (busy || !t.trim()) return;
+    input.value = '';
+    submitText(t);
+  });
+
+  // ---------- カード選択パネル ----------
+  var picker = document.getElementById('picker');
+  var toggle = document.getElementById('pickerToggle');
+  var ORDER = ['h0', 'h1', 'v0', 'v1', 'b0', 'b1', 'b2', 'b3', 'b4'];
+  var pk = { slots: {}, active: 'h0', rank: null, street: 0 };
+
+  toggle.addEventListener('click', function () {
+    picker.hidden = !picker.hidden;
+    toggle.setAttribute('aria-expanded', String(!picker.hidden));
+    if (!picker.hidden) scrollEnd();
+  });
+
+  var ranksEl = document.getElementById('pkRanks');
+  var suitsEl = document.getElementById('pkSuits');
+  for (var r = 12; r >= 0; r--) {
+    var rb = document.createElement('button');
+    rb.type = 'button'; rb.className = 'key'; rb.id = 'rk-' + r; rb.dataset.rank = r;
+    rb.textContent = rankLabel(r);
+    rb.setAttribute('aria-pressed', 'false');
+    ranksEl.appendChild(rb);
+  }
+  for (var s = 0; s < 4; s++) {
+    var sb = document.createElement('button');
+    sb.type = 'button'; sb.className = 'key s' + s; sb.id = 'su-' + s; sb.dataset.suit = s;
+    sb.textContent = PE.SUIT_SYM[s];
+    sb.setAttribute('aria-label', ['スペード', 'ハート', 'ダイヤ', 'クラブ'][s]);
+    suitsEl.appendChild(sb);
+  }
+
+  function usedCards() {
+    var u = {};
+    ORDER.forEach(function (k) { if (pk.slots[k] !== undefined) u[pk.slots[k]] = k; });
+    return u;
+  }
+  function renderPicker() {
+    var u = usedCards();
+    ORDER.forEach(function (k) {
+      var el = document.getElementById('slot-' + k), c = pk.slots[k];
+      el.className = 'slot' + (c !== undefined ? ' filled s' + PE.suitOf(c) : '') + (pk.active === k ? ' active' : '');
+      el.innerHTML = c !== undefined ? rankLabel(PE.rankOf(c)) + '<br>' + PE.SUIT_SYM[PE.suitOf(c)] : '';
+    });
+    ranksEl.querySelectorAll('.key').forEach(function (b) {
+      var rr = +b.dataset.rank, full = true;
+      for (var ss = 0; ss < 4; ss++) if (u[PE.makeCard(rr, ss)] === undefined) full = false;
+      b.disabled = full;
+      b.setAttribute('aria-pressed', String(pk.rank === rr));
+    });
+    suitsEl.querySelectorAll('.key').forEach(function (b) {
+      var ss = +b.dataset.suit;
+      b.disabled = pk.rank === null || u[PE.makeCard(pk.rank, ss)] !== undefined;
+    });
+    document.querySelectorAll('#pkStreet button').forEach(function (b) {
+      b.setAttribute('aria-checked', String(+b.dataset.street === pk.street));
+    });
+  }
+  function nextEmpty(from) {
+    var i = ORDER.indexOf(from);
+    for (var j = 1; j <= ORDER.length; j++) {
+      var k = ORDER[(i + j) % ORDER.length];
+      if (pk.slots[k] === undefined) return k;
+    }
+    return from;
+  }
+  document.getElementById('pkSlots').addEventListener('click', function (e) {
+    var b = e.target.closest('.slot');
+    if (!b) return;
+    var k = b.dataset.slot;
+    if (pk.active === k && pk.slots[k] !== undefined) delete pk.slots[k];
+    pk.active = k; pk.rank = null;
+    document.getElementById('pkError').textContent = '';
+    renderPicker();
+  });
+  ranksEl.addEventListener('click', function (e) {
+    var b = e.target.closest('.key');
+    if (!b || b.disabled) return;
+    pk.rank = +b.dataset.rank;
+    renderPicker();
+  });
+  suitsEl.addEventListener('click', function (e) {
+    var b = e.target.closest('.key');
+    if (!b || b.disabled || pk.rank === null) return;
+    pk.slots[pk.active] = PE.makeCard(pk.rank, +b.dataset.suit);
+    pk.rank = null;
+    pk.active = nextEmpty(pk.active);
+    renderPicker();
+  });
+  document.getElementById('pkStreet').addEventListener('click', function (e) {
+    var b = e.target.closest('button');
+    if (!b) return;
+    pk.street = +b.dataset.street;
+    renderPicker();
+  });
+  document.getElementById('pkClear').addEventListener('click', function () {
+    pk.slots = {}; pk.active = 'h0'; pk.rank = null;
+    document.getElementById('pkError').textContent = '';
+    renderPicker();
+  });
+  document.getElementById('pkJudge').addEventListener('click', function () {
+    if (busy) return;
+    var err = document.getElementById('pkError');
+    var sl = pk.slots;
+    function has(k) { return sl[k] !== undefined; }
+    if (!has('h0') || !has('h1')) { err.textContent = '自分の手札を2枚選んでくれ'; return; }
+    if (!has('v0') || !has('v1')) { err.textContent = '相手の手札を2枚選んでくれ'; return; }
+    var board = [];
+    for (var i = 0; i < 5; i++) {
+      if (has('b' + i)) {
+        if (board.length !== i) { err.textContent = 'ボードは左から順に埋めてくれ'; return; }
+        board.push(sl['b' + i]);
+      }
+    }
+    if (board.length === 1 || board.length === 2) { err.textContent = 'ボードは3枚（フロップ）から選んでくれ'; return; }
+    if (board.length < pk.street) { err.textContent = PE.STREET_NAMES[pk.street] + 'でオールインなら、そのときのボードも選んでくれ'; return; }
+    err.textContent = '';
+    var spec = { hero: [sl.h0, sl.h1], vill: [sl.v0, sl.v1], board: board, street: pk.street, autoSuits: false, streetGuessed: false };
+    var txt = cardText(sl.h0) + cardText(sl.h1) + ' vs ' + cardText(sl.v0) + cardText(sl.v1) +
+      (board.length ? '  ボード ' + board.map(cardText).join(' ') : '') + '（' + PE.STREET_NAMES[pk.street] + 'でオールイン）';
+    addUser(txt);
+    judge(spec, { source: 'picker', text: txt });
+  });
+  renderPicker();
+
+  // ---------- このページについて ----------
+  var about = document.getElementById('about');
+  document.getElementById('aboutLogOn').hidden = !CONFIG.LOG_ENDPOINT;
+  if (CONFIG.FEEDBACK_URL) {
+    document.getElementById('feedbackLink').href = CONFIG.FEEDBACK_URL;
+    document.getElementById('aboutFeedback').hidden = false;
+  }
+  document.getElementById('aboutOpen').addEventListener('click', function () {
+    if (typeof about.showModal === 'function') about.showModal(); else about.setAttribute('open', '');
+  });
+  document.getElementById('aboutClose').addEventListener('click', function () {
+    if (typeof about.close === 'function') about.close(); else about.removeAttribute('open');
+  });
+  about.addEventListener('click', function (e) { if (e.target === about) about.close(); });
+
+  // ---------- 最初の画面 ----------
+  helpBubble('よう。バッドビートを食らったか？');
+  addTag('例');
+  var sample = EXAMPLES[0];
+  addUser(sample);
+  judge(PE.parse(sample), { log: false }).then(function () {
+    addTag('ここから下が、お前の相談');
+  });
+})();
+</script>
+</body>
+</html>
