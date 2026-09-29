@@ -77,7 +77,6 @@ for (const scheme of ['light', 'dark']) {
       expect(bad, '読みにくい組み合わせ').toEqual([]);
     });
     test('同情チップ（金色の背景）の文字が 4.5 以上', async ({ page }) => {
-      test.fixme(scheme === 'light', '不具合の疑い（軽微）: ライトで「同情」チップ（バッドビートの金色の面）の文字コントラストが 3.85 で、小さい文字の基準 4.5 に届かない');
       await openApp(page); // 見本の判定は「バッドビート」（同情チップ）
       const [c] = await contrasts(page, ['.verdict .v-chip']);
       expect(c.ratio).toBeGreaterThanOrEqual(4.5);
@@ -126,10 +125,9 @@ for (const width of [360, 375, 430]) {
 }
 
 // ヘッダー（見出し・口調・説明）が 1 行に収まる。
-// 430px は index.html のスマホ用の切り替え（max-width: 420px）の外なので、見出しが 2 行に折り返し、副題も 3 行になる（実測: ヘッダー高さ 136px）。
+// 360・375・430px はどれも index.html のスマホ用の切り替え（max-width: 480px）の内側なので、ヘッダーは 1 行になる（v1.4.2 で 420px から広げた）
 for (const width of [360, 375, 430]) {
   test('幅 ' + width + 'px: ヘッダーが 1 行（見出しが折り返さず、口調・説明ボタンが同じ行）', async ({ page }) => {
-    test.fixme(width === 430, '不具合の疑い: 幅 430px（iPhone Pro Max 級）でヘッダーが折り返す。スマホ用の切り替えが max-width: 420px のため、430px では「口調：荒め」「このページについて」の長い表示と副題が出て見出しが 2 行になる');
     await page.setViewportSize({ width, height: 800 });
     await openApp(page);
     const m = await page.evaluate(() => {
@@ -178,7 +176,7 @@ test('判定後: 結果カード（1 ハンド・1 日まとめ）の見出し�
 });
 
 // ---------- くわしく見る ----------
-test('くわしく見る: スマホ幅（420px 以下）では閉じ、PC 幅では開いていて、押すと開閉する', async ({ page }) => {
+test('くわしく見る: スマホ幅（480px 以下）では閉じ、PC 幅では開いていて、押すと開閉する', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await openApp(page);
   let d = page.locator('.verdict').first().locator('details.verdict-details');

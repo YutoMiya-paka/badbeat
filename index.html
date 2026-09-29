@@ -25,7 +25,7 @@
     --felt-2: #0A4735;
     --on-felt: #F4FAF6;
     --chip: #C23A2B;
-    --gold: #A87A12;
+    --gold: #8A6410;
     --blue: #2B5CAE;
     --flat: #6B7770;
     --tie: #B9C4BE;
@@ -137,7 +137,7 @@
   .about details > summary { cursor:pointer; font-size:13px; font-weight:700; color:var(--blue); }
   .about details[open] > summary { margin-bottom:8px; }
   .eq-count { font-size:11px; color:var(--muted); text-align:right; }
-  @media (max-width: 420px) { .about-short { display: inline; } .tone-long { display:none; } .tone-short { display:inline; } .top { gap:7px; padding-left:10px; padding-right:10px; } .tone-btn,.about-btn { padding:5px 7px; font-size:11px; } }
+  @media (max-width: 480px) { .about-short { display: inline; } .tone-long { display:none; } .tone-short { display:inline; } .top { gap:7px; padding-left:10px; padding-right:10px; } .tone-btn,.about-btn { padding:5px 7px; font-size:11px; } }
   .about-btn {
     flex: none;
     font: inherit; font-size: 12px;
@@ -495,7 +495,7 @@
   .btn:disabled { opacity: .5; cursor: default; }
   button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
-  @media (max-width: 420px) {
+  @media (max-width: 480px) {
     .about-long { display: none; }
     .top-text > p { display:none; }
     .note, .trivia, .eq-label, .eq-count, .di-skip { font-size:13px; }
@@ -613,7 +613,7 @@
   'use strict';
   // ---------- 設定 ----------
   var CONFIG = {
-    APP_VERSION: '1.4.1',
+    APP_VERSION: '1.4.2',
     LOG_ENDPOINT: 'https://script.google.com/macros/s/AKfycbxIEZgditDueEGFRzdc2UGNL9YqSMDN3CsJ1S30ozdiyNqvGewb2i4SGiOZbyvL2klC/exec',   // Apps Script ウェブアプリの /exec URL。空なら記録を送らない
     FEEDBACK_URL: '',   // ご意見の送り先（フォームなどの URL）。空なら表示しない
     LOG_LIMIT: 50       // 1 タブあたりの送信上限
@@ -977,7 +977,7 @@
       eqBlock(a, PE.STREET_NAMES[s.street] + 'でオールインした時点') +
       '<p class="v-line">' + line + '</p>' +
       extra.map(function (x) { return '<p class="note">' + x + '</p>'; }).join('') +
-      '<details class="verdict-details"' + (window.matchMedia('(max-width: 420px)').matches ? '' : ' open') + '><summary>くわしく見る</summary>' +
+      '<details class="verdict-details"' + (window.matchMedia('(max-width: 480px)').matches ? '' : ' open') + '><summary>くわしく見る</summary>' +
       factsBlock(res, key) +
       timelineBlock(res) +
       '<p class="trivia">' + pick(triviaPool) + '</p>' +
