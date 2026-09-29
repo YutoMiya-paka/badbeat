@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 require('../engine.js');
 const PE = globalThis.PokerEngine;
 let checks = 0;
@@ -104,6 +105,72 @@ async function main() {
     assert.ok(Math.abs(kk.eq-.18)<.01,`KK vs AA ${kk.eq}`);
     assert.ok(Math.abs(ak.eq-.43)<.01,`AKo vs QQ ${ak.eq}`);
     assert.ok(Date.now()-start<600,`three samplesets took ${Date.now()-start}ms`);
+  });
+  check('勝率の不変条件・組み合わせ数・入れ替え', async () => {
+    const p = PE.parse('AsAh vs KdKc');
+    const a = await PE.analyze(p), b = await PE.analyze({ ...p, hero: p.vill, vill: p.hero });
+    for (const x of a.steps) {
+      assert.ok(Math.abs(x.win + x.lose + x.tie - 1) < 1e-12);
+      assert.equal(x.boards, x.street === 0 ? 1712304 : x.street === 3 ? 990 : 44);
+    }
+    assert.ok(Math.abs(a.allin.win - b.allin.lose) < 1e-12);
+    assert.ok(Math.abs(a.allin.lose - b.allin.win) < 1e-12);
+  });
+  check('既知のフロップ・ターン勝率を固定値と照合', async () => {
+    for (const [input, expected] of [
+      ['AhKh vs QsQd フロップ Qc 8h 3h', 0.25555555555555554],
+      ['AhKh vs QsQd ターン Qc 8h 3h 2s', 0.1590909090909091]
+    ]) {
+      const p = PE.parse(input); assert.ok(!p.error, input);
+      const x = await PE.analyze(p);
+      assert.equal(x.steps[0].boards, p.street === 3 ? 990 : 44);
+      assert.equal(x.allin.win, expected);
+      assert.ok(Number.isFinite(x.allin.win));
+    }
+  });
+  check('リバーで相手を救う札と残り枚数', () => {
+    const p = PE.parse('AsAh vs KdKc Qh 7c 2d Ks');
+    const r = PE.riverCards(p.hero, p.vill, p.board.slice(0, 4));
+    assert.equal(r.total, 44); assert.ok(r.villWins.length + r.ties.length <= r.total);
+  });
+  check('最終ボードの勝ち・引き分け検出', async () => {
+    const win = PE.parse('AsAh vs KdKc Qh 7c 2d 3s 4h');
+    const tie = PE.parse('AsKd vs QhJc 2s 3h 4d 5c 6s');
+    assert.equal((await PE.analyze(win)).final.result, 'win');
+    assert.equal((await PE.analyze(tie)).final.result, 'tie');
+  });
+  check('進捗通知が100%に到達', async () => {
+    const p = PE.parse('AsAh vs KdKc'); let max = 0;
+    await PE.analyze(p, x => { max = Math.max(max, x); }); assert.equal(max, 1);
+  });
+  check('オールイン場面は明示指定を優先', () => {
+    const p = PE.parse('AhKh vs QsQd フロップでオールイン、ターン Kc 8h 3h 2s');
+    assert.equal(p.street, 3);
+  });
+  check('役判定を種付き乱数1万手で21通り総当たりと照合', () => {
+    let seed = 0x12345678;
+    const rnd = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed; };
+    for (let n = 0; n < 10000; n++) {
+      const deck = Array.from({ length: 52 }, (_, i) => i);
+      for (let i = 51; i > 0; i--) { const j = rnd() % (i + 1); [deck[i], deck[j]] = [deck[j], deck[i]]; }
+      const seven = deck.slice(0, 7); let best = -1;
+      for (let a = 0; a < 7; a++) for (let b = a + 1; b < 7; b++) {
+        const five = seven.filter((_, i) => i !== a && i !== b); best = Math.max(best, PE.evalCards(five));
+      }
+      assert.equal(PE.evalCards(seven), best, `seed stream hand ${n}`);
+    }
+  });
+  check('やさしめ文言に荒い語がなく、parseエラーに言い換えがある', () => {
+    const html = fs.readFileSync(require.resolve('../index.html'), 'utf8');
+    const gentleBlock = html.match(/var LINES_GENTLE = (\{[\s\S]*?\n  \});/);
+    assert.ok(gentleBlock);
+    const gentleLines = Function('return (' + gentleBlock[1] + ')')();
+    const words = JSON.stringify(gentleLines);
+    for (const bad of ['お前', 'ねえ', 'だぞ', 'しろ']) assert.ok(!words.includes(bad), bad);
+    const fn = html.match(/function gentleParseError\(e\) \{[\s\S]*?\n  \}/);
+    assert.ok(fn); const gentleError = Function('e', fn[0].slice(fn[0].indexOf('{') + 1, -1));
+    const samples = ['今日', 'AKs', 'Ah vs KdKc', 'AhAs vs Kd', 'AhAs vs KdKc 2s 2s', 'AhAs vs KdKc 2s 3s 4s 5s 6s 7s', 'AhAs vs KdKc Qh 7c 2d'];
+    for (const s of samples) { const e = PE.parse(s).error; if (e) assert.notEqual(gentleError(e), e, e); }
   });
   console.log(`${checks} checks OK`);
 }
