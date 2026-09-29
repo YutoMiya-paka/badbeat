@@ -613,7 +613,7 @@
   'use strict';
   // ---------- 設定 ----------
   var CONFIG = {
-    APP_VERSION: '1.4.2',
+    APP_VERSION: '1.4.3',
     LOG_ENDPOINT: 'https://script.google.com/macros/s/AKfycbxIEZgditDueEGFRzdc2UGNL9YqSMDN3CsJ1S30ozdiyNqvGewb2i4SGiOZbyvL2klC/exec',   // Apps Script ウェブアプリの /exec URL。空なら記録を送らない
     FEEDBACK_URL: '',   // ご意見の送り先（フォームなどの URL）。空なら表示しない
     LOG_LIMIT: 50       // 1 タブあたりの送信上限
@@ -1150,6 +1150,13 @@
       addBot(gentle() ? '<p>どの手で負けたか読み取れませんでした。「KKで5回中3回負けた」のように、手と回数を入力してください。</p>' : '<p>どの手で負けたのか読めなかった。「KKで5回中3回負けた」みたいに、手と回数を書いてくれ。</p>');
       return;
     }
+    // 「4回中6回」のように負けがオールイン回数より多いものは、その手だけ回数を聞き直す
+    d.items.forEach(function (it) {
+      if (it.n !== null && it.k !== null && it.k > it.n) {
+        it.overcount = { n: it.n, k: it.k };
+        it.n = null; it.k = null;
+      }
+    });
     daily = { items: d.items, text: text, source: source, asking: null };
     askNext();
   }
@@ -1159,6 +1166,12 @@
       var it = daily.items[i];
       if (it.skip || (it.n !== null && it.k !== null)) continue;
       daily.asking = i;
+      if (it.overcount) {
+        addBot('<p>' + handLabelHTML(it) + (gentle()
+          ? 'は「' + it.overcount.n + '回中' + it.overcount.k + '回負け」になっていて、負けがオールインの回数より多くなっています。'
+          : 'が「' + it.overcount.n + '回中' + it.overcount.k + '回負け」になってるぞ。負けがオールインの回数より多い。') + '</p>');
+        it.overcount = null;
+      }
       var q = it.k === null
         ? handLabelHTML(it) + (gentle() ? 'で何回オールインして、何回負けましたか？（例：5回中3回）' : 'で何回オールインして、何回負けた？（例：5回中3回）')
         : handLabelHTML(it) + (gentle() ? 'は、全部で何回オールインしましたか？ 負けは' + it.k + '回と伺っています。（全部負けなら「全部」と入力してください）' : 'は、全部で何回オールインした？ 負けは' + it.k + '回と聞いてる。（全部負けなら「全部」）');

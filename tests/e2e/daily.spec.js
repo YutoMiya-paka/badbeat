@@ -1,7 +1,7 @@
 // 1 日まとめ: 聞き返しの全パターンと、結果の数字（engine を node で呼んだ期待値と突き合わせる）。
 // 1 テストごとにページを開き直すと、起動時の見本の計算が毎回入って遅いので、関連する流れは 1 ページでまとめて確かめる（test.step で区切る）。
 const { test, expect } = require('@playwright/test');
-const { openApp, judge, ask, payloads, dayExpect, DAY_TITLE, DAY_TITLE_GENTLE, webkitFilter } = require('./helpers');
+const { openApp, judge, ask, send, payloads, dayExpect, DAY_TITLE, DAY_TITLE_GENTLE, webkitFilter } = require('./helpers');
 webkitFilter(test, { keep: ['基本の流れ'] });
 test.describe.configure({ timeout: 120000 });
 
@@ -184,4 +184,32 @@ test('やさしめ: 聞き返し・言い直し・結果の文言。1 日まと�
   await expect(b).toHaveText('回数が分かる勝負がなかったため、計算できませんでした。');
   for (let i = 0; i < 3; i++) await ask(page, 'KKで5回中3回負けた');
   await expect(page.getByText('休憩')).toHaveCount(0);
+});
+
+// v1.4.3: 負けがオールイン回数より多い入力は、丸めずにエラーを出して聞き直す
+test('負けがオールイン回数より多い（4回中6回）: エラーを出して聞き直す（荒め・やさしめ）', async ({ page }) => {
+  await openApp(page);
+  await test.step('荒め: 最初の入力で多い → 指摘と聞き返し', async () => {
+    const q = await ask(page, 'KKで4回中6回負けた');
+    await expect(q).toContainText('KKで' + Q_ALL);
+    const bots = page.locator('.row.bot .bubble');
+    await expect(bots.nth((await bots.count()) - 2)).toContainText('KKが「4回中6回負け」になってるぞ。負けがオールインの回数より多い。');
+  });
+  await test.step('荒め: 答えでもまた多い → もう一度言い直しを求める', async () => {
+    const r = await ask(page, '4回中6回');
+    await expect(r).toContainText('負けた回数がオールインの回数より多いぞ。もう一回書いてくれ。');
+  });
+  await test.step('荒め: 正しい答えで結果が出る', async () => {
+    const before = await luckCount(page);
+    await send(page, '6回中4回');
+    await page.waitForFunction(n => document.querySelectorAll('.luck').length > n, before);
+    await expect(page.locator('.verdict').last().locator('.luck-sub')).toContainText('オールイン 6回で 4回負け');
+  });
+  await test.step('やさしめ: 同じ入力で丁寧な指摘', async () => {
+    await page.locator('#toneToggle').click();
+    const q = await ask(page, 'AAで3回中5回負けた');
+    const bots = page.locator('.row.bot .bubble');
+    await expect(bots.nth((await bots.count()) - 2)).toContainText('AAは「3回中5回負け」になっていて、負けがオールインの回数より多くなっています。');
+    await expect(q).toContainText('何回オールインして、何回負けましたか？');
+  });
 });

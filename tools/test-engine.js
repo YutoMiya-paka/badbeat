@@ -172,6 +172,12 @@ async function main() {
     const samples = ['今日', 'AKs', 'Ah vs KdKc', 'AhAs vs Kd', 'AhAs vs KdKc 2s 2s', 'AhAs vs KdKc 2s 3s 4s 5s 6s 7s', 'AhAs vs KdKc Qh 7c 2d'];
     for (const s of samples) { const e = PE.parse(s).error; if (e) assert.notEqual(gentleError(e), e, e); }
   });
+  check('1日まとめ: 負けがオールイン回数より多い入力は丸めずに返す（画面で聞き直す）', () => {
+    const it = PE.parseDaily('KKで4回中6回負けた').items[0];
+    assert.strictEqual(it.n, 4); assert.strictEqual(it.k, 6);
+    const it2 = PE.parseDaily('AK 5回やって7回負け').items[0];
+    assert.strictEqual(it2.n, 5); assert.strictEqual(it2.k, 7);
+  });
   console.log(`${checks} checks OK`);
 }
 

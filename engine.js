@@ -347,7 +347,7 @@
     }
     else if ((m = body.match(/(\d+)\s*(?:戦|回)\s*(\d+)\s*敗/))) { n = +m[1]; k = +m[2]; }
     else if ((m = body.match(/(\d+)/))) { k = +m[1]; if (all) n = k; }
-    if (k !== null && n !== null && k > n) k = n;
+    // 負け（k）がオールイン回数（n）より多い入力は丸めずにそのまま返す。画面側でエラーを出して聞き直す
     return { n: n, k: k };
   }
   function parseDaily(text) {
