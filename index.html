@@ -1252,11 +1252,24 @@
   var ORDER = ['h0', 'h1', 'v0', 'v1', 'b0', 'b1', 'b2', 'b3', 'b4'];
   var pk = { slots: {}, active: 'h0', rank: null, street: 0 };
 
+  function setPicker(open) {
+    picker.hidden = !open;
+    toggle.setAttribute('aria-expanded', String(open));
+    if (open) scrollEnd();
+  }
+  // 自分で「カード」ボタンから閉じたら、そのあとはメッセージ欄をタップしても自動では開かない
+  var pickerClosedByUser = false;
   toggle.addEventListener('click', function () {
-    picker.hidden = !picker.hidden;
-    toggle.setAttribute('aria-expanded', String(!picker.hidden));
-    if (!picker.hidden) scrollEnd();
+    var open = picker.hidden;
+    if (!open) pickerClosedByUser = true;
+    setPicker(open);
   });
+  // メッセージ欄をタップしたら、カード選択の欄を出す
+  function openPickerOnTap() {
+    if (picker.hidden && !pickerClosedByUser) setPicker(true);
+  }
+  input.addEventListener('focus', openPickerOnTap);
+  input.addEventListener('click', openPickerOnTap);
 
   var ranksEl = document.getElementById('pkRanks');
   var suitsEl = document.getElementById('pkSuits');
