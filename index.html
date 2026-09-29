@@ -45,7 +45,8 @@
     --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
   }
   @media (prefers-color-scheme: dark) {
-        color-scheme: dark;
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
       --bg: #0B1310;
       --surface: #14211B;
       --ink: #E6EEE9;
