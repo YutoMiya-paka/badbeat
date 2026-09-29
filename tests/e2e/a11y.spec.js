@@ -37,7 +37,11 @@ test('名前・aria の静的な確認: ボタンの名前、口調ボタン、�
     for (const n of ['自分 1枚目', '自分 2枚目', '相手 1枚目', '相手 2枚目', 'フロップ 1枚目', 'フロップ 2枚目', 'フロップ 3枚目', 'ターン', 'リバー']) {
       await expect(page.getByRole('button', { name: n, exact: true })).toBeVisible();
     }
-    for (const n of ['スペード', 'ハート', 'ダイヤ', 'クラブ']) await expect(page.getByRole('button', { name: n })).toBeVisible();
+    // マークのボタンは数字を選んでから出る（v1.4.1）。名前は「A スペード」のように数字入り
+    await expect(page.locator('#pkSuitWait')).toBeVisible();
+    await page.locator('#rk-12').click();
+    for (const n of ['A スペード', 'A ハート', 'A ダイヤ', 'A クラブ']) await expect(page.getByRole('button', { name: n, exact: true })).toBeVisible();
+    await expect(page.locator('#pkStep')).toHaveAttribute('aria-live', 'polite');
     await page.locator('#aboutOpen').click();
     await expect(page.getByRole('dialog', { name: 'このページについて' })).toBeVisible();
     await expect(page.getByRole('button', { name: '閉じる' })).toHaveCount(2); // 右上の × と下の「閉じる」

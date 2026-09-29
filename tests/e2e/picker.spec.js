@@ -280,3 +280,64 @@ test('判定（続き）: 10 の表記・ボード 5 枚の勝ち・判定後の
     expect(await slotText(page, 'h0')).toBe('A♠');
   });
 });
+
+// v1.4.1（デザインの回答「判定後のカード欄と選び方」）
+test('判定後はカード欄を閉じ、カードと場面は残る。エラーのときは閉じない', async ({ page }) => {
+  await openApp(page);
+  await waitIdle(page);
+  await openPicker(page);
+  await page.locator('#pkClear').click();
+  // 入力チェックで止まったときは閉じない
+  await pickCards(page, [['A', 's'], ['A', 'h']]);
+  await page.locator('#pkJudge').click();
+  await expect(page.locator('#pkError')).not.toHaveText('');
+  await expect(page.locator('#picker')).toBeVisible();
+  // 通ったら閉じる
+  await pickCards(page, [['K', 'd'], ['K', 'c']]);
+  const before = await page.locator('.verdict').count();
+  await page.locator('#pkJudge').click();
+  await expect(page.locator('#picker')).toBeHidden();
+  await expect(page.locator('#pickerToggle')).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('.verdict')).toHaveCount(before + 1, { timeout: 30000 });
+  await waitIdle(page);
+  // 結果の見出しが会話ログの中に見えている
+  const inView = await page.evaluate(() => {
+    const log = document.getElementById('log').getBoundingClientRect();
+    const t = [...document.querySelectorAll('.v-title')].pop().getBoundingClientRect();
+    return t.top >= log.top && t.bottom <= log.bottom;
+  });
+  expect(inView).toBe(true);
+  // 開き直すと前のカードが残っている
+  await page.locator('#pickerToggle').click();
+  await expect(page.locator('#picker')).toBeVisible();
+  expect(await slotText(page, 'h0')).toBe('A♠');
+  expect(await slotText(page, 'v1')).toBe('K♣');
+  await expect(page.locator('#st-0')).toHaveAttribute('aria-checked', 'true');
+});
+
+test('マークは数字を選んでから: ①②の案内、待ちの表示、数字入りのボタン、使用済みは文字色だけ薄い', async ({ page }) => {
+  await openApp(page);
+  await waitIdle(page);
+  await openPicker(page);
+  await page.locator('#pkClear').click();
+  await expect(page.locator('#pkStep')).toHaveText('① 数字を選ぶ（自分 1枚目）');
+  await expect(page.locator('#pkSuits')).toBeHidden();
+  await expect(page.locator('#pkSuitWait')).toBeVisible();
+  await expect(page.locator('#pkSuitWait')).toHaveText('数字を選ぶと、ここでマークを選べます');
+  await page.locator('#rk-12').click();
+  await expect(page.locator('#pkStep')).toHaveText('② A のマークを選ぶ（自分 1枚目）');
+  await expect(page.locator('#pkSuitWait')).toBeHidden();
+  for (const [i, t] of [[0, 'A♠'], [1, 'A♥'], [2, 'A♦'], [3, 'A♣']]) await expect(page.locator('#su-' + i)).toHaveText(t);
+  await page.locator('#su-0').click();
+  // マークを押したら次の枠へ進み、①と待ちの表示に戻る
+  await expect(page.locator('#pkStep')).toHaveText('① 数字を選ぶ（自分 2枚目）');
+  await expect(page.locator('#pkSuitWait')).toBeVisible();
+  // 使用済みの A♠ は押せないが、面は薄くしない（opacity 1）
+  await page.locator('#rk-12').click();
+  const used = page.locator('#su-0');
+  await expect(used).toBeDisabled();
+  expect(await used.evaluate(el => getComputedStyle(el).opacity)).toBe('1');
+  // 枠をタップしても①に戻る
+  await page.locator('#slot-v0').click();
+  await expect(page.locator('#pkStep')).toHaveText('① 数字を選ぶ（相手 1枚目）');
+});
