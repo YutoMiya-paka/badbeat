@@ -901,11 +901,10 @@
         line = gentle() ? 'KKでAAに当たるのは厳しい結果です。その手でプリフロップに降りるのは難しい場面だったと思います。' : 'KKでAAに当たるのは事故だ。その手でプリフロップに降りろとは、俺も言えねえ。';
       } else line = fill(pick(lines[key]), d);
       if (!sample) lossStreak++;
-      var restNow = !sample && lossStreak > 0 && lossStreak % 3 === 0;
+      // 休憩の声かけはやさしめ口調だけ（ユーザー指定）
+      var restNow = gentle() && !sample && lossStreak > 0 && lossStreak % 3 === 0;
       if (restNow) {
-        extra.push(gentle()
-          ? '続けて負けが入っていますね。少し席を立って、水を飲むなどして休憩しませんか。落ち着いてからの方が、判断もしやすくなります。'
-          : lossStreak + '連続で負けの相談だな。一回席を立て。熱くなった頭で打つと、次の負けは本物の自業自得になるぞ。');
+        extra.push('続けて負けが入っていますね。少し席を立って、水を飲むなどして休憩しませんか。落ち着いてからの方が、判断もしやすくなります。');
       } else if ((key === 'real' || key === 'bad') && (lastSingleVerdict === 'real' || lastSingleVerdict === 'bad')) line += gentle() ? ' 何度か続いた場合は、「KKで5回中3回負けた」のように書くと、今日1日の結果もまとめて確認できます。' : ' 今日は厄日だな。『KKで5回中3回負けた』みたいに書けば、今日1日まとめて見てやるぞ。';
       lastSingleVerdict = key;
       if (!sample && !gentle() && !toneHintShown && (key === 'sekkyo' || key === 'dead')) {
