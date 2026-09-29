@@ -303,10 +303,92 @@
     return { hero: hero, vill: vill, board: board, street: street, autoSuits: autoSuits, streetGuessed: streetGuessed };
   }
 
+  // ---------- 1 日まとめ ----------
+  function dailyNormalize(text) {
+    var t = String(text).normalize('NFKC');
+    var nums = { '一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'十一':11,'十二':12,'十三':13,'十四':14,'十五':15,'十六':16,'十七':17,'十八':18,'十九':19,'二十':20 };
+    Object.keys(nums).sort(function(a,b){return b.length-a.length;}).forEach(function(k){ t=t.replace(new RegExp(k,'g'),String(nums[k])); });
+    NAME_MAP.forEach(function(p){ t=t.replace(p[0],p[1]); });
+    return t;
+  }
+  var COUNT_RE = /\d+\s*(?:回|戦|敗|勝)|何回も|いっぱい|たくさん|めちゃくちゃ|ずっと/;
+  function looksDaily(text) {
+    var t = dailyNormalize(text);
+    var p = parse(text);
+    if (COUNT_RE.test(t)) return !(p && !p.error && p.board && p.board.length >= 3 && !p.autoSuits);
+    // 回数が無くても「今日」などがあり、1 ハンドとして読めないときは 1 日まとめとして扱う
+    return /今日|一日|1日/.test(t) && !!p.error;
+  }
+  // 最初の手を 1 つ読む。{ hero, label, start, end } か null
+  function parseHandTokens(t) {
+    var re = /([2-9TJQKA])([shdc♠♥♦♣])\s*([2-9TJQKA])([shdc♠♥♦♣])/i, m = re.exec(t);
+    var re2 = /(?<![A-Za-z])([2-9TJQKA])([2-9TJQKA])([so])?(?![A-Za-z])/i, n = re2.exec(t);
+    if (m && (!n || m.index <= n.index)) {
+      var r1 = RANKS.indexOf(m[1].toUpperCase()), r2 = RANKS.indexOf(m[3].toUpperCase());
+      var hi = Math.max(r1, r2), lo = Math.min(r1, r2), suited = hi === lo ? null : m[2].toLowerCase() === m[4].toLowerCase();
+      return { hero: { r1: hi, r2: lo, suited: suited }, label: RANKS[hi] + RANKS[lo] + (hi === lo ? '' : suited ? 's' : 'o'),
+        start: m.index, end: m.index + m[0].length };
+    }
+    if (!n) return null;
+    var x = RANKS.indexOf(n[1].toUpperCase()), y = RANKS.indexOf(n[2].toUpperCase());
+    var h2 = Math.max(x, y), l2 = Math.min(x, y), su = h2 === l2 ? null : n[3] ? n[3].toLowerCase() === 's' : null;
+    return { hero: { r1: h2, r2: l2, suited: su }, label: RANKS[h2] + RANKS[l2] + (h2 === l2 ? '' : su === true ? 's' : su === false ? 'o' : ''),
+      start: n.index, end: n.index + n[0].length };
+  }
+  var LOSS_WORD = /負け|割られ|やられ|飛ば|抜かれ|まくられ|刺され|敗/;
+  function readCounts(body) {
+    var n = null, k = null, m;
+    var all = /全部|全敗|全て|すべて|1回も勝てな|とも負け/.test(body);
+    body = body.replace(/1回も勝て[^\d]*/g, ' ');
+    if ((m = body.match(/(\d+)\s*勝\s*(\d+)\s*敗/))) { n = +m[1] + +m[2]; k = +m[2]; }
+    else if ((m = body.match(/(\d+)\s*戦\s*全敗/))) { n = +m[1]; k = n; }
+    else if ((m = body.match(/(\d+)\s*(?:回|戦)?\s*(?:中|やって|オールインして|勝負して|して)\s*(\d+)\s*回?\s*(勝)?/))) {
+      n = +m[1]; k = m[3] ? Math.max(0, n - +m[2]) : +m[2];
+    }
+    else if ((m = body.match(/(\d+)\s*(?:戦|回)\s*(\d+)\s*敗/))) { n = +m[1]; k = +m[2]; }
+    else if ((m = body.match(/(\d+)/))) { k = +m[1]; if (all) n = k; }
+    if (k !== null && n !== null && k > n) k = n;
+    return { n: n, k: k };
+  }
+  function parseDaily(text) {
+    var t = dailyNormalize(text), parts = t.split(/[。\n、,]+|あと|それと/), joined = [];
+    parts.forEach(function (p) {
+      if (!p.trim()) return;
+      if (!parseHandTokens(p) && joined.length) joined[joined.length - 1] += ' ' + p; else joined.push(p);
+    });
+    var items = [], leftovers = [];
+    joined.forEach(function (raw) {
+      var one = parseHandTokens(raw);
+      if (!one) { leftovers.push(raw.trim()); return; }
+      var rest = raw.slice(one.end), two = parseHandTokens(rest);
+      var body = raw.slice(0, one.start) + ' ' + (two ? rest.slice(0, two.start) + ' ' + rest.slice(two.end) : rest);
+      var c = readCounts(body), vague = false;
+      if (c.k === null && /何回も|いっぱい|たくさん|めちゃくちゃ|ずっと/.test(body)) vague = true;
+      items.push({ label: one.label, hero: one.hero, vill: two ? two.hero : null, n: c.n, k: c.k, vague: vague, raw: raw.trim() });
+    });
+    return { items: items, leftovers: leftovers };
+  }
+  function mulberry32(a){return function(){var t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296;};}
+  var DEFAULT_RANGE={text:'99以上のペア、AJs以上、KQs、AQo以上',hands:[]};
+  (function(){for(var a=0;a<13;a++)for(var b=0;b<=a;b++){if(a===b&&a>=7)DEFAULT_RANGE.hands.push({r1:a,r2:b,suited:null});else if(a===12&&b===9)DEFAULT_RANGE.hands.push({r1:a,r2:b,suited:true});else if(a===12&&b>=10){DEFAULT_RANGE.hands.push({r1:a,r2:b,suited:true});DEFAULT_RANGE.hands.push({r1:a,r2:b,suited:false});}else if(a===11&&b===10)DEFAULT_RANGE.hands.push({r1:a,r2:b,suited:true});}})();
+  function handEquity(hero,vill,samples){
+    samples=samples||30000; var seed=2166136261, txt=String(hero.r1)+','+hero.r2+','+hero.suited+':'+(vill?JSON.stringify(vill):'range');for(var z=0;z<txt.length;z++)seed=Math.imul(seed^txt.charCodeAt(z),16777619);var rnd=mulberry32(seed>>>0);
+    function combo(h){var out=[];for(var s=0;s<4;s++)for(var q=0;q<4;q++)if(h.r1!==h.r2||s<q){if(h.r1!==h.r2&&h.suited===true&&s!==q)continue;if(h.r1!==h.r2&&h.suited===false&&s===q)continue;out.push([makeCard(h.r1,s),makeCard(h.r2,q)]);}return out;}
+    var hc=combo(hero), vc=vill?combo(vill):null, w=0,l=0,t=0;
+    for(var i=0;i<samples;i++){var hh=hc[(rnd()*hc.length)|0], vv=null,deck=[];if(vc){var avail=vc.filter(function(x){return x[0]!==hh[0]&&x[0]!==hh[1]&&x[1]!==hh[0]&&x[1]!==hh[1];});vv=avail[(rnd()*avail.length)|0];}else{for(var q=0;q<DEFAULT_RANGE.hands.length;q++){var c=combo(DEFAULT_RANGE.hands[q]);for(var j=0;j<c.length;j++)if(!hh.includes(c[j][0])&&!hh.includes(c[j][1]))deck.push(c[j]);}vv=deck[(rnd()*deck.length)|0];}
+      var used={};hh.concat(vv).forEach(function(c){used[c]=1;});deck=[];for(var c=0;c<52;c++)if(!used[c])deck.push(c);for(var q=deck.length-1;q>0;q--){var ix=(rnd()*(q+1))|0,x=deck[q];deck[q]=deck[ix];deck[ix]=x;}var board=deck.slice(0,5),a=evalCards(hh.concat(board)),b=evalCards(vv.concat(board));if(a>b)w++;else if(a<b)l++;else t++;
+    }
+    return {eq:(w+t/2)/samples,lose:l/samples,tie:t/samples,samples:samples,range:vill?null:DEFAULT_RANGE};
+  }
+  function binomTail(n,k,p){if(k<=0)return 1;if(k>n)return 0;var probs=[1];for(var i=0;i<n;i++){var next=new Array(probs.length+1).fill(0);for(var j=0;j<probs.length;j++){next[j]+=probs[j]*(1-p);next[j+1]+=probs[j]*p;}probs=next;}return probs.slice(k).reduce(function(a,b){return a+b;},0);}
+  function sumTail(list,K){var d=[1];list.forEach(function(x){var next=new Array(d.length+x.n).fill(0);d.forEach(function(v,i){for(var j=0;j<=x.n;j++){var c=binomTail(x.n,j,x.p)-binomTail(x.n,j+1,x.p);next[i+j]+=v*c;}});d=next;});return d.slice(K).reduce(function(a,b){return a+b;},0);}
+
   root.PokerEngine = {
     RANKS: RANKS, SUITS: SUITS, SUIT_SYM: SUIT_SYM, CAT_NAMES: CAT_NAMES, STREET_NAMES: STREET_NAMES,
     makeCard: makeCard, rankOf: rankOf, suitOf: suitOf, cardStr: cardStr,
     evalCards: evalCards, categoryOf: categoryOf,
-    equity: equity, riverCards: riverCards, analyze: analyze, parse: parse
+    equity: equity, riverCards: riverCards, analyze: analyze, parse: parse,
+    looksDaily: looksDaily, parseDaily: parseDaily, handEquity: handEquity,
+    binomTail: binomTail, sumTail: sumTail, DEFAULT_RANGE: DEFAULT_RANGE
   };
 })(typeof window !== 'undefined' ? window : globalThis);

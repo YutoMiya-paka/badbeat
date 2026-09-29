@@ -121,6 +121,8 @@
     border-bottom: 3px solid var(--felt-2);
   }
   .top-text { flex: 1; min-width: 0; }
+  .about-short { display: none; }
+  @media (max-width: 420px) { .about-short { display: inline; } }
   .about-btn {
     flex: none;
     font: inherit; font-size: 12px;
@@ -303,6 +305,37 @@
     padding-left: 8px;
   }
 
+  /* 1日まとめ */
+  .luck {
+    display: flex; flex-direction: column; gap: 4px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--bg);
+  }
+  .luck-label { font-size: 12px; color: var(--muted); }
+  .luck-num { font-family: var(--display); font-size: 26px; line-height: 1.2; color: var(--c, var(--ink)); }
+  .luck-sub { font-size: 12px; color: var(--muted); }
+  .day-list { display: flex; flex-direction: column; gap: 8px; }
+  .day-item {
+    display: flex; flex-direction: column; gap: 2px;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+  .di-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .di-hand { font-family: var(--mono); font-weight: 700; font-size: 16px; }
+  .di-vs { font-size: 12px; color: var(--muted); }
+  .di-tag {
+    margin-left: auto;
+    font-size: 11px; font-weight: 700; letter-spacing: .08em;
+    padding: 1px 7px; border-radius: 4px;
+    color: var(--surface); background: var(--t, var(--flat));
+  }
+  .di-nums { font-size: 13px; }
+  .di-nums b, .di-tail b { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .di-tail { font-size: 13px; color: var(--muted); }
+  .di-skip { font-size: 12px; color: var(--muted); }
+
   .examples { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   .ex {
     font: inherit; font-size: 12px;
@@ -417,6 +450,8 @@
   button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
   @media (max-width: 420px) {
+    .about-long { display: none; }
+    .top h1 { font-size: 18px; }
     .v-title { font-size: 20px; }
     .tl-row { gap: 6px; }
     .key { font-size: 13px; padding: 7px 0; }
@@ -432,7 +467,7 @@
       <h1>バッドビート相談所</h1>
       <p>負けたハンドを書けば、おやっさんが確率だけで判定する</p>
     </div>
-    <button type="button" class="about-btn" id="aboutOpen" aria-haspopup="dialog">このページについて</button>
+    <button type="button" class="about-btn" id="aboutOpen" aria-haspopup="dialog" aria-label="このページについて"><span class="about-long">このページについて</span><span class="about-short">説明</span></button>
   </header>
 
   <dialog class="about" id="about" aria-labelledby="aboutTitle">
@@ -520,7 +555,7 @@
   'use strict';
   // ---------- 設定 ----------
   var CONFIG = {
-    APP_VERSION: '1.1.0',
+    APP_VERSION: '1.2.0',
     LOG_ENDPOINT: 'https://script.google.com/macros/s/AKfycbxIEZgditDueEGFRzdc2UGNL9YqSMDN3CsJ1S30ozdiyNqvGewb2i4SGiOZbyvL2klC/exec',   // Apps Script ウェブアプリの /exec URL。空なら記録を送らない
     FEEDBACK_URL: '',   // ご意見の送り先（フォームなどの URL）。空なら表示しない
     LOG_LIMIT: 50       // 1 タブあたりの送信上限
@@ -838,14 +873,16 @@
   var HELP_HTML =
     '<p>負けたハンドを書いてくれ。確率だけで判定する。</p>' +
     '<p>書き方：自分の手札 → 相手の手札 → ボードの順。スートは s h d c（♠♥♦♣でもいい）。<code>AhAs vs KdKc</code> のように書く。スートを省いて <code>AA vs KK</code> や <code>AKo</code> <code>AKs</code> でもいい。</p>' +
-    '<p>フロップやターンでオールインしたなら「フロップでオールイン」と書いて、そのときのボードも入れてくれ。下の「カード」ボタンから選んでもいい。</p>';
+    '<p>フロップやターンでオールインしたなら「フロップでオールイン」と書いて、そのときのボードも入れてくれ。下の「カード」ボタンから選んでもいい。</p>' +
+    '<p>1日まとめての相談もできる。「KKで5回中3回負けた、AKも8回中5回」みたいに、手と回数を書いてくれ。</p>';
   var EXAMPLES = [
     'AhAs vs KdKc プリフロでオールイン Qh 7c 2d Ks 9s',
     '72o vs AA',
     'AhKh vs QsQd フロップでオールイン Qc 8h 3h 2s 9d',
     'キングスがエーシーズに負けた',
     'AK vs QQ',
-    'JsTs vs AcKd ターンでオールイン Qs 9d 2c 3h 4d'
+    'JsTs vs AcKd ターンでオールイン Qs 9d 2c 3h 4d',
+    '今日キングス3回割られた、AKも8回中5回負けた'
   ];
   function helpBubble(intro) {
     var row = addBot((intro ? '<p>' + intro + '</p>' : '') + HELP_HTML +
@@ -862,21 +899,197 @@
     if (!text || busy) return;
     source = source || 'text';
     addUser(text);
+    if (source === 'example') daily = null;
+    if (daily && daily.asking !== null && answerDaily(text)) return;
+    route(text, source);
+  }
+
+  function route(text, source) {
+    if (PE.looksDaily(text)) { startDaily(text, source); return; }
     var parsed = PE.parse(text);
     if (parsed.error) {
       sendLog({ source: source, text: text, ok: false, error: parsed.error });
       if (parsed.error === 'none') {
-        if (/回|今日|一日|1日/.test(text)) {
-          addBot('<p>1日まとめての相談は、まだ準備中だ。今は1ハンドずつ持ってきてくれ。</p>');
-        } else {
-          helpBubble('カードが読み取れなかった。');
-        }
+        helpBubble('カードが読み取れなかった。');
       } else {
         addBot('<p>' + esc(parsed.error) + '</p>');
       }
       return;
     }
     judge(parsed, { source: source, text: text });
+  }
+
+  // ---------- 1日まとめ ----------
+  // daily = { items, text, source, asking: 聞き返し中の items の番号 | null }
+  var daily = null;
+  var KANJI = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9 };
+  function firstNumber(text) {
+    var t = text.normalize('NFKC').replace(/([一二三四五六七八九])?十([一二三四五六七八九])?/g, function (_, a, b) {
+      return String((a ? KANJI[a] : 1) * 10 + (b ? KANJI[b] : 0));
+    }).replace(/[一二三四五六七八九]/g, function (c) { return String(KANJI[c]); });
+    var m = t.match(/\d+/);
+    return m ? parseInt(m[0], 10) : null;
+  }
+  function handLabelHTML(item) { return '<span class="di-hand">' + esc(item.label) + '</span>'; }
+
+  function startDaily(text, source) {
+    var d = PE.parseDaily(text);
+    if (!d.items.length) {
+      sendLog({ source: source, text: text, ok: false, error: 'daily_none' });
+      addBot('<p>どの手で負けたのか読めなかった。「KKで5回中3回負けた」みたいに、手と回数を書いてくれ。</p>');
+      return;
+    }
+    daily = { items: d.items, text: text, source: source, asking: null };
+    askNext();
+  }
+
+  function askNext() {
+    for (var i = 0; i < daily.items.length; i++) {
+      var it = daily.items[i];
+      if (it.skip || (it.n !== null && it.k !== null)) continue;
+      daily.asking = i;
+      var q = it.k === null
+        ? handLabelHTML(it) + 'で何回オールインして、何回負けた？（例：5回中3回）'
+        : handLabelHTML(it) + 'は、全部で何回オールインした？ 負けは' + it.k + '回と聞いてる。（全部負けなら「全部」）';
+      addBot('<p>' + q + '</p><p class="note">分からなければ「わからない」でいい。その手は外して計算する。</p>');
+      return;
+    }
+    daily.asking = null;
+    finishDaily();
+  }
+
+  // 聞き返しへの答え。答えとして扱えなければ false（新しい相談として読み直す）
+  function answerDaily(text) {
+    var it = daily.items[daily.asking];
+    if (/わから|分から|不明|パス|スキップ|忘れ/.test(text)) {
+      it.skip = true;
+      askNext();
+      return true;
+    }
+    if (it.k !== null && /全部|全敗|全て|すべて|ぜんぶ/.test(text)) {
+      it.n = it.k;
+      askNext();
+      return true;
+    }
+    if (it.k === null) {
+      var r = PE.parseDaily(it.label + ' ' + text).items[0];
+      if (r && r.n !== null && r.k !== null) {
+        if (r.k > r.n) { addBot('<p>負けた回数がオールインの回数より多いぞ。もう一回書いてくれ。</p>'); return true; }
+        it.n = r.n; it.k = r.k;
+        askNext();
+        return true;
+      }
+      if (firstNumber(text) !== null) {
+        addBot('<p>回数を2つ教えてくれ。「5回中3回」みたいに。</p>');
+        return true;
+      }
+      daily = null;
+      return false;
+    }
+    var n = firstNumber(text);
+    if (n === null) { daily = null; return false; }
+    if (n < it.k) { addBot('<p>負けが' + it.k + '回なら、オールインは' + it.k + '回以上のはずだ。もう一回教えてくれ。</p>'); return true; }
+    if (n > 300) { addBot('<p>さすがに多すぎる。1日のオールインの回数を教えてくれ。</p>'); return true; }
+    it.n = n;
+    askNext();
+    return true;
+  }
+
+  var DAY_LINES = {
+    worst: [
+      '……今日は慰めるしかねえ。これ以上に負ける日なんて{odds}日に1日だ。お前は悪くない。帰って寝ろ。',
+      '数字で見ても、今日は{P}しか起きない負け方だ。こんな日はもう打つな。温かいもん食って寝ろ。'
+    ],
+    bad: [
+      'ついてない日だったな。これ以上に負ける確率は{P}。お前のせいじゃない。',
+      '{odds}日に1日の悪い日だ。明日は切り替えろ。'
+    ],
+    slight: [
+      'ちょっとついてないくらいだ。これくらいの日は{odds}日に1日はある。',
+      '悪い方ではあるが、よくある範囲だ。愚痴るのは1杯だけにしとけ。'
+    ],
+    normal: [
+      '普通の日だ。これ以上に負ける日だって{P}もある。不運を名乗るには早い。',
+      '確率どおりに近い。バッドビートの日じゃねえ、ただの負けた日だ。'
+    ],
+    sekkyo: [
+      'おい、確率どおりか、それよりマシなくらいだ。不運だとか、なめたこと言ってんじゃねえ。',
+      'これで不運とか言ってたら罰が当たるぞ。もっと負ける日なんて{P}もあるんだ。'
+    ]
+  };
+  var DAY_VERDICT = {
+    worst:  { title: '歴史的に不運な日', chip: '同情', color: 'var(--gold)' },
+    bad:    { title: 'ついてない日', chip: '同情', color: 'var(--gold)' },
+    slight: { title: 'ちょっとついてない日', chip: '普通', color: 'var(--felt)' },
+    normal: { title: '普通の日', chip: '普通', color: 'var(--flat)' },
+    sekkyo: { title: '不運じゃねえ', chip: '説教', color: 'var(--chip)' }
+  };
+  function dayBand(t) { return t < 0.01 ? 'worst' : t < 0.05 ? 'bad' : t < 0.2 ? 'slight' : t < 0.5 ? 'normal' : 'sekkyo'; }
+  var ITEM_TAG = {
+    worst: ['かなり不運', 'var(--gold)'], bad: ['不運', 'var(--gold)'], slight: ['ちょい不運', 'var(--felt)'],
+    normal: ['普通', 'var(--flat)'], sekkyo: ['順当', 'var(--chip)']
+  };
+  function classLabel(h) {
+    if (!h) return '';
+    if (h.label) return h.label;
+    var a = PE.RANKS[Math.max(h.r1, h.r2)], b = PE.RANKS[Math.min(h.r1, h.r2)];
+    return a + b + (h.r1 === h.r2 ? '' : h.suited === true ? 's' : h.suited === false ? 'o' : '');
+  }
+
+  async function finishDaily() {
+    var d = daily;
+    daily = null;
+    setBusy(true);
+    var wait = addBot('<span class="typing"><span class="dots"><span></span><span></span><span></span></span><span>1日分を計算中</span></span>');
+    await new Promise(function (r) { setTimeout(r, 30); });
+    try {
+      var rows = [], list = [], K = 0, usesRange = false;
+      d.items.forEach(function (it) {
+        if (it.skip) {
+          rows.push('<div class="day-item"><div class="di-head">' + handLabelHTML(it) + '</div><span class="di-skip">回数が分からないので外した</span></div>');
+          return;
+        }
+        var he = PE.handEquity(it.hero, it.vill, 30000);
+        var p = he.lose + he.tie / 2;
+        var tail = PE.binomTail(it.n, it.k, p);
+        var tag = ITEM_TAG[dayBand(tail)];
+        if (!it.vill) usesRange = true;
+        list.push({ n: it.n, p: p });
+        K += it.k;
+        rows.push('<div class="day-item"><div class="di-head">' + handLabelHTML(it) +
+          '<span class="di-vs">' + (it.vill ? 'vs ' + esc(classLabel(it.vill)) : 'vs よくある相手の手') + '</span>' +
+          '<span class="di-tag" style="--t:' + tag[1] + '">' + tag[0] + '</span></div>' +
+          '<div class="di-nums">' + it.n + '回中 <b>' + it.k + '回負け</b>。1回あたり負ける確率 <b>' + pct(p) + '</b>、普通なら <b>' + (it.n * p).toFixed(1) + '回</b></div>' +
+          '<div class="di-tail">これ以上負ける確率 <b>' + pct(tail) + '</b></div></div>');
+      });
+      if (!list.length) {
+        wait.querySelector('.bubble').innerHTML = '<p>回数が分かる勝負が1つもないから、計算できなかった。</p>';
+      } else {
+        var tAll = PE.sumTail(list, K);
+        var band = dayBand(tAll), v = DAY_VERDICT[band];
+        var data = { P: pct(tAll), odds: odds(tAll) || '∞' };
+        var nTotal = list.reduce(function (a, x) { return a + x.n; }, 0);
+        wait.querySelector('.bubble').innerHTML =
+          '<div class="verdict" style="--c:' + v.color + '">' +
+          '<div class="v-head"><span class="v-chip">' + v.chip + '</span><span class="v-title">' + v.title + '</span></div>' +
+          '<div class="luck"><span class="luck-label">今日と同じか、もっと悪い負け方になる確率</span>' +
+            '<span class="luck-num">' + pct(tAll) + '</span>' +
+            '<span class="luck-sub">オールイン ' + nTotal + '回で ' + K + '回負け' + (odds(tAll) ? '（' + odds(tAll) + '日に1日の負け方）' : '') + '</span></div>' +
+          '<p class="v-line">' + fill(pick(DAY_LINES[band]), data) + '</p>' +
+          '<div class="day-list">' + rows.join('') + '</div>' +
+          (usesRange
+            ? '<p class="note">相手の手が書かれていない勝負は、オールインに付き合ってくる典型的な手（' + esc(PE.DEFAULT_RANGE.text) + '）を相手に、プリフロップでオールインした前提で計算した。</p>'
+            : '<p class="note">プリフロップでオールインした前提で計算した。</p>') +
+          '<p class="trivia">' + pick(TRIVIA.favorite) + '</p>' +
+          '</div>';
+      }
+      sendLog({ source: d.source, text: d.text, ok: !!list.length, error: list.length ? '' : 'daily_nocount', verdict: 'daily' });
+    } catch (e) {
+      wait.querySelector('.bubble').innerHTML = '<p>計算中に止まった。もう一回送ってくれ。</p>';
+      sendLog({ source: d.source, text: d.text, ok: false, error: 'daily_failed' });
+    }
+    scrollEnd();
+    setBusy(false);
   }
 
   document.getElementById('composer').addEventListener('submit', function (e) {
@@ -1005,6 +1218,7 @@
     var txt = cardText(sl.h0) + cardText(sl.h1) + ' vs ' + cardText(sl.v0) + cardText(sl.v1) +
       (board.length ? '  ボード ' + board.map(cardText).join(' ') : '') + '（' + PE.STREET_NAMES[pk.street] + 'でオールイン）';
     addUser(txt);
+    daily = null;
     judge(spec, { source: 'picker', text: txt });
   });
   renderPicker();

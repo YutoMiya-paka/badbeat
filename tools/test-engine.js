@@ -66,6 +66,45 @@ async function main() {
     const pct = res.allin.win * 100;
     check('equity ' + input, () => assert.ok(Math.abs(pct - expected) <= 0.05, `expected ${expected}%, got ${pct.toFixed(4)}%`));
   }
+  check('looksDaily examples', () => {
+    assert.equal(PE.looksDaily('KKで3回負けた'), true);
+    assert.equal(PE.looksDaily('今日AAが2回割られた'), true);
+    assert.equal(PE.looksDaily('AA vs KK'), false);
+    assert.equal(PE.looksDaily('AhAs vs KdKc Qh 7c 2d Ks 9s'), false);
+    assert.equal(PE.looksDaily('72o vs AA'), false);
+  });
+  check('parseDaily counts and leftovers', () => {
+    let d=PE.parseDaily('今日キングス3回割られた、AKも8回中5回負けた');
+    assert.deepEqual(d.items.map(x=>[x.label,x.n,x.k]),[['KK',null,3],['AK',8,5]]);
+    d=PE.parseDaily('AAで4戦全敗'); assert.deepEqual([d.items[0].n,d.items[0].k],[4,4]);
+    d=PE.parseDaily('KKでAAに2回負けた'); assert.equal(d.items[0].vill.r1,12); assert.equal(d.items[0].k,2);
+    d=PE.parseDaily('QQ 三回やって三回とも負け'); assert.deepEqual([d.items[0].n,d.items[0].k],[3,3]);
+    d=PE.parseDaily('AK何回も負けた'); assert.equal(d.items[0].vague,true);
+    d=PE.parseDaily('今日ついてない'); assert.equal(d.items.length,0); assert.equal(d.leftovers.length,1);
+  });
+  check('parseDaily edge cases', () => {
+    const nk = t => PE.parseDaily(t).items.map(i => [i.label, i.n, i.k, !!i.vill]);
+    assert.deepStrictEqual(nk('AhKh 5回中4回負け'), [['AKs', 5, 4, false]]);
+    assert.deepStrictEqual(nk('ロケットで2回飛ばされた。あとQQで、4回中3回やられた'), [['AA', null, 2, false], ['QQ', 4, 3, false]]);
+    assert.deepStrictEqual(nk('3勝5敗 AK'), [['AK', 8, 5, false]]);
+    assert.deepStrictEqual(nk('AAで3回やって1回も勝てなかった'), [['AA', 3, 3, false]]);
+    assert.strictEqual(PE.looksDaily('今日AA vs KKで負けた'), false);
+  });
+  check('binomial and convolution tails', () => {
+    assert.ok(Math.abs(PE.binomTail(3,3,.2)-.008)<1e-12);
+    assert.ok(Math.abs(PE.binomTail(8,5,.55)-.477)<.002);
+    assert.ok(Math.abs(PE.sumTail([{n:8,p:.55}],5)-PE.binomTail(8,5,.55))<1e-12);
+  });
+  check('handEquity estimates and speed', () => {
+    const start=Date.now();
+    const aa=PE.handEquity({r1:12,r2:12,suited:null},null);
+    const kk=PE.handEquity({r1:11,r2:11,suited:null},{r1:12,r2:12,suited:null});
+    const ak=PE.handEquity({r1:12,r2:11,suited:false},{r1:10,r2:10,suited:null});
+    assert.ok(Math.abs(aa.eq-.85)<.04,`AA range equity ${aa.eq}`);
+    assert.ok(Math.abs(kk.eq-.18)<.01,`KK vs AA ${kk.eq}`);
+    assert.ok(Math.abs(ak.eq-.43)<.01,`AKo vs QQ ${ak.eq}`);
+    assert.ok(Date.now()-start<600,`three samplesets took ${Date.now()-start}ms`);
+  });
   console.log(`${checks} checks OK`);
 }
 
