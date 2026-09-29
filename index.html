@@ -613,7 +613,7 @@
   'use strict';
   // ---------- 設定 ----------
   var CONFIG = {
-    APP_VERSION: '1.4.3',
+    APP_VERSION: '1.4.4',
     LOG_ENDPOINT: 'https://script.google.com/macros/s/AKfycbxIEZgditDueEGFRzdc2UGNL9YqSMDN3CsJ1S30ozdiyNqvGewb2i4SGiOZbyvL2klC/exec',   // Apps Script ウェブアプリの /exec URL。空なら記録を送らない
     FEEDBACK_URL: '',   // ご意見の送り先（フォームなどの URL）。空なら表示しない
     LOG_LIMIT: 50       // 1 タブあたりの送信上限
@@ -1022,6 +1022,7 @@
   function setBusy(b) {
     busy = b;
     sendBtn.disabled = b;
+    input.disabled = b;
     document.getElementById('pkJudge').disabled = b;
   }
 
@@ -1155,6 +1156,9 @@
       if (it.n !== null && it.k !== null && it.k > it.n) {
         it.overcount = { n: it.n, k: it.k };
         it.n = null; it.k = null;
+      } else if ((it.n !== null && it.n > 300) || (it.k !== null && it.k > 300)) {
+        it.toomany = true;
+        it.n = null; it.k = null;
       }
     });
     daily = { items: d.items, text: text, source: source, asking: null };
@@ -1171,6 +1175,12 @@
           ? 'は「' + it.overcount.n + '回中' + it.overcount.k + '回負け」になっていて、負けがオールインの回数より多くなっています。'
           : 'が「' + it.overcount.n + '回中' + it.overcount.k + '回負け」になってるぞ。負けがオールインの回数より多い。') + '</p>');
         it.overcount = null;
+      }
+      if (it.toomany) {
+        addBot('<p>' + handLabelHTML(it) + (gentle()
+          ? 'の回数が多すぎるようです（300回まで）。'
+          : 'の回数が多すぎる（300回まで）。') + '</p>');
+        it.toomany = false;
       }
       var q = it.k === null
         ? handLabelHTML(it) + (gentle() ? 'で何回オールインして、何回負けましたか？（例：5回中3回）' : 'で何回オールインして、何回負けた？（例：5回中3回）')
@@ -1268,13 +1278,17 @@
     await new Promise(function (r) { setTimeout(r, 30); });
     try {
       var rows = [], list = [], K = 0, usesRange = false;
-      d.items.forEach(function (it) {
+      for (var ii = 0; ii < d.items.length; ii++) {
+        var it = d.items[ii];
         if (it.skip) {
           rows.push('<div class="day-item"><div class="di-head">' + handLabelHTML(it) + '</div><span class="di-skip">' + (gentle() ? '回数が分からないため、計算から外しました' : '回数が分からないので外した') + '</span></div>');
-          return;
+          continue;
         }
+        // 1 手ごとに描画の機会を渡す（計算中も画面が固まらないように）
+        await new Promise(function (r) { setTimeout(r, 0); });
         var he = PE.handEquity(it.hero, it.vill, 30000);
-        var p = he.lose + he.tie / 2;
+        // 負けの確率は引き分けを除いて数える（「負けた回数」に引き分けは含まれない）
+        var p = he.tie < 1 ? he.lose / (1 - he.tie) : 0;
         var tail = PE.binomTail(it.n, it.k, p);
         var tag = (gentle() ? ITEM_TAG_GENTLE : ITEM_TAG)[dayBand(tail)];
         if (!it.vill) usesRange = true;
@@ -1285,7 +1299,7 @@
           '<span class="di-tag" style="--t:' + tag[1] + '">' + tag[0] + '</span></div>' +
           '<div class="di-nums">' + it.n + '回中 <b>' + it.k + '回負け</b>。1回あたり負ける確率 <b>' + pct(p) + '</b>、' + (gentle() ? '期待される負け数は ' : '普通なら ') + '<b>' + (it.n * p).toFixed(1) + '回</b>' + (gentle() ? 'です。' : '') + '</div>' +
           '<div class="di-tail">' + (gentle() ? 'これ以上負ける確率は ' : 'これ以上負ける確率 ') + '<b>' + pct(tail) + '</b>' + (gentle() ? 'です。' : '') + '</div></div>');
-      });
+      }
       if (!list.length) {
         wait.querySelector('.bubble').innerHTML = gentle() ? '<p>回数が分かる勝負がなかったため、計算できませんでした。</p>' : '<p>回数が分かる勝負が1つもないから、計算できなかった。</p>';
       } else {

@@ -155,7 +155,7 @@ function dayExpect(text, fix = {}, skip = []) {
     const f = fix[i] || {};
     const n = f.n !== undefined ? f.n : it.n, k = f.k !== undefined ? f.k : it.k;
     const he = PE.handEquity(it.hero, it.vill, 30000);
-    const p = he.lose + he.tie / 2;
+    const p = he.tie < 1 ? he.lose / (1 - he.tie) : 0; // 画面と同じく引き分けを除いた負けの確率（v1.4.4）
     const tail = PE.binomTail(n, k, p);
     list.push({ n, p }); K += k;
     items.push({ label: it.label, n, k, p, tail, band: dayBand(tail), nums: n + '回中 ' + k + '回負け。1回あたり負ける確率 ' + pctStr(p) + '、普通なら ' + (n * p).toFixed(1) + '回', tailText: 'これ以上負ける確率 ' + pctStr(tail) });

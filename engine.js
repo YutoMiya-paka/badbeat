@@ -207,7 +207,15 @@
   function parse(text) {
     var t = text.normalize('NFKC');
     NAME_MAP.forEach(function (p) { t = t.replace(p[0], p[1]); });
-    t = t.replace(/\bv\.?s\.?\b|対/gi, ' / ').replace(/10(?=[shdc♠♥♦♣])/gi, 'T');
+    t = t.replace(/\bv\.?s\.?\b|対/gi, ' / ');
+    // 「10ハート」のようなマークの名前を記号に、ランクとしての「10」を T に（回数の「10回」などは触らない）
+    t = t.replace(/(10|[2-9TJQKA])\s*(スペード|ハート|ダイヤ|クラブ)/gi, function (_, r, w) {
+      return r + { 'スペード': 's', 'ハート': 'h', 'ダイヤ': 'd', 'クラブ': 'c' }[w];
+    });
+    t = t.replace(/(?<!\d)10\s*10(?!\d)/g, 'TT')
+      .replace(/10(?=[shdc♠♥♦♣])/gi, 'T')
+      .replace(/(?<=[2-9TJQKA])10(?![\d回戦勝敗])/gi, 'T')
+      .replace(/(?<!\d)10(?=[2-9TJQKA](?![shdc♠♥♦♣])(?:[so](?![A-Za-z]))?(?![A-Za-z\d]))/gi, 'T');
 
     var items = [], m;
     TOKEN_RE.lastIndex = 0;
@@ -306,8 +314,12 @@
   // ---------- 1 日まとめ ----------
   function dailyNormalize(text) {
     var t = String(text).normalize('NFKC');
-    var nums = { '一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'十一':11,'十二':12,'十三':13,'十四':14,'十五':15,'十六':16,'十七':17,'十八':18,'十九':19,'二十':20 };
-    Object.keys(nums).sort(function(a,b){return b.length-a.length;}).forEach(function(k){ t=t.replace(new RegExp(k,'g'),String(nums[k])); });
+    // 漢数字（一〜九十九）を算用数字に。十の位と一の位を組み合わせて読む（二十一 → 21）
+    var KD = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9 };
+    t = t.replace(/([一二三四五六七八九])?十([一二三四五六七八九])?|[一二三四五六七八九]/g, function (w, a, b) {
+      if (w.indexOf('十') < 0) return String(KD[w]);
+      return String((a ? KD[a] : 1) * 10 + (b ? KD[b] : 0));
+    });
     NAME_MAP.forEach(function(p){ t=t.replace(p[0],p[1]); });
     return t;
   }
@@ -322,7 +334,8 @@
   // 最初の手を 1 つ読む。{ hero, label, start, end } か null
   function parseHandTokens(t) {
     var re = /([2-9TJQKA])([shdc♠♥♦♣])\s*([2-9TJQKA])([shdc♠♥♦♣])/i, m = re.exec(t);
-    var re2 = /(?<![A-Za-z])([2-9TJQKA])([2-9TJQKA])([so])?(?![A-Za-z])/i, n = re2.exec(t);
+    // 「99回」「22戦」のような回数の数字は手として読まない
+    var re2 = /(?<![A-Za-z\d])([2-9TJQKA])([2-9TJQKA])([so])?(?![A-Za-z])(?!\s*(?:回|戦|勝|敗|中))/i, n = re2.exec(t);
     if (m && (!n || m.index <= n.index)) {
       var r1 = RANKS.indexOf(m[1].toUpperCase()), r2 = RANKS.indexOf(m[3].toUpperCase());
       var hi = Math.max(r1, r2), lo = Math.min(r1, r2), suited = hi === lo ? null : m[2].toLowerCase() === m[4].toLowerCase();
@@ -339,9 +352,12 @@
   function readCounts(body) {
     var n = null, k = null, m;
     var all = /全部|全敗|全て|すべて|1回も勝てな|とも負け/.test(body);
-    body = body.replace(/1回も勝て[^\d]*/g, ' ');
+    body = body.replace(/1回も勝て[^\d]*/g, ' ').replace(/1日/g, ' ');
     if ((m = body.match(/(\d+)\s*勝\s*(\d+)\s*敗/))) { n = +m[1] + +m[2]; k = +m[2]; }
     else if ((m = body.match(/(\d+)\s*戦\s*全敗/))) { n = +m[1]; k = n; }
+    else if ((m = body.match(/(\d+)\s*戦\s*(\d+)\s*勝/))) { n = +m[1]; k = Math.max(0, n - +m[2]); }
+    else if ((m = body.match(/(\d+)\s*回?\s*勝って\s*(\d+)\s*回?\s*負/))) { n = +m[1] + +m[2]; k = +m[2]; }
+    else if ((m = body.match(/(\d+)\s*回?\s*負けて\s*(\d+)\s*回?\s*勝/))) { n = +m[1] + +m[2]; k = +m[1]; }
     else if ((m = body.match(/(\d+)\s*(?:回|戦)?\s*(?:中|やって|オールインして|勝負して|して)\s*(\d+)\s*回?\s*(勝)?/))) {
       n = +m[1]; k = m[3] ? Math.max(0, n - +m[2]) : +m[2];
     }

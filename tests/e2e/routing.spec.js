@@ -103,7 +103,7 @@ test('計算中は送信・カードの判定ボタンが押せず、Enter（送
   // 計算（プリフロの全通り）が終わる前に確かめるため、1 回の処理の中で「状態の確認 → 別の入力の送信操作」まで行う
   const during = await page.evaluate(() => {
     const send = document.getElementById('send'), judgeBtn = document.getElementById('pkJudge'), msg = document.getElementById('msg');
-    const state = { sendDisabled: send.disabled, judgeDisabled: judgeBtn.disabled, typing: document.querySelectorAll('.typing').length };
+    const state = { sendDisabled: send.disabled, judgeDisabled: judgeBtn.disabled, inputDisabled: msg.disabled, typing: document.querySelectorAll('.typing').length };
     msg.value = '72o vs AA';
     document.getElementById('composer').requestSubmit(); // Enter と同じ送信操作
     state.valueKept = msg.value;
@@ -112,6 +112,7 @@ test('計算中は送信・カードの判定ボタンが押せず、Enter（送
   });
   expect(during.sendDisabled, '計算中は送信ボタンが押せない').toBe(true);
   expect(during.judgeDisabled, '計算中はカード欄の判定ボタンも押せない').toBe(true);
+  expect(during.inputDisabled, '計算中は入力欄も触れない（v1.4.4）').toBe(true);
   expect(during.typing).toBe(1);
   expect(during.valueKept, '送られず入力欄に残る').toBe('72o vs AA');
   expect(during.userRows, '2 つ目の入力は吹き出しにならない').toBe(0);

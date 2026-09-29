@@ -178,6 +178,32 @@ async function main() {
     const it2 = PE.parseDaily('AK 5回やって7回負け').items[0];
     assert.strictEqual(it2.n, 5); assert.strictEqual(it2.k, 7);
   });
+  check('1日まとめの読み取り（v1.4.4）: 〇戦〇勝・勝って負けて・漢数字 21 以上・一日・回数の 99 を手と読まない', () => {
+    const nk = t => PE.parseDaily(t).items.map(i => [i.label, i.n, i.k, !!i.vill]);
+    assert.deepStrictEqual(nk('KKで10戦8勝'), [['KK', 10, 2, false]]);
+    assert.deepStrictEqual(nk('KKで10戦8勝利'), [['KK', 10, 2, false]]);
+    assert.deepStrictEqual(nk('KKで10戦8勝2敗'), [['KK', 10, 2, false]]);
+    assert.deepStrictEqual(nk('KK 2回勝って3回負けた'), [['KK', 5, 3, false]]);
+    assert.deepStrictEqual(nk('KK 3回負けて2回勝った'), [['KK', 5, 3, false]]);
+    assert.deepStrictEqual(nk('KKで二十一回中三回負けた'), [['KK', 21, 3, false]]);
+    assert.deepStrictEqual(nk('KKで九十九回中五十回'), [['KK', 99, 50, false]]);
+    assert.deepStrictEqual(nk('KKで十回中九回'), [['KK', 10, 9, false]]);
+    assert.deepStrictEqual(nk('今日一日でKK3回負け'), [['KK', null, 3, false]]);
+    assert.deepStrictEqual(nk('KKで22回中5回'), [['KK', 22, 5, false]]);
+    assert.deepStrictEqual(nk('99で5回中3回負けた'), [['99', 5, 3, false]]);
+    assert.deepStrictEqual(nk('KKで99に3回負けた'), [['KK', null, 3, true]]);
+  });
+  check('10 の書き方（v1.4.4）: 1010・10 10・10ハート・10A を読む。回数の 10 は壊さない', () => {
+    const cs = t => { const r = PE.parse(t); assert.ok(!r.error, t + ': ' + r.error); return [r.hero, r.vill, r.board].map(x => x.map(PE.cardStr).join('')).join('|'); };
+    assert.strictEqual(cs('1010 vs AA').split('|')[0].replace(/[shdc]/g, ''), 'TT');
+    assert.strictEqual(cs('10 10 vs AA').split('|')[0].replace(/[shdc]/g, ''), 'TT');
+    assert.strictEqual(cs('10ハート 9ハート vs AsAd'), 'Th9h|AsAd|');
+    assert.strictEqual(cs('Aスペード Kスペード vs AdAc'), 'AsKs|AdAc|');
+    assert.strictEqual(cs('10A vs KK').split('|')[0].replace(/[shdc]/g, ''), 'TA');
+    assert.strictEqual(cs('KK vs AA 10h 9d 2c').split('|')[2], 'Th9d2c');
+    assert.deepStrictEqual(PE.parseDaily('KKで10回中3回負けた').items.map(i => [i.n, i.k]), [[10, 3]]);
+    assert.strictEqual(PE.looksDaily('今日10回負けた'), true);
+  });
   console.log(`${checks} checks OK`);
 }
 

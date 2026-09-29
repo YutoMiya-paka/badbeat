@@ -213,3 +213,12 @@ test('負けがオールイン回数より多い（4回中6回）: エラーを�
     await expect(q).toContainText('何回オールインして、何回負けましたか？');
   });
 });
+
+// v1.4.4: 最初の読み取りでも 300 回を超えたら聞き直す
+test('回数が多すぎる（500回中3回）: 最初の入力でも指摘して聞き直す', async ({ page }) => {
+  await openApp(page);
+  const q = await ask(page, 'KKで500回中3回負けた');
+  await expect(q).toContainText('KKで' + Q_ALL);
+  const bots = page.locator('.row.bot .bubble');
+  await expect(bots.nth((await bots.count()) - 2)).toContainText('KKの回数が多すぎる（300回まで）。');
+});
