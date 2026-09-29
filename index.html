@@ -953,8 +953,8 @@
     if (parsed.error) {
       sendLog({ source: source, text: text, ok: false, error: parsed.error });
       if (parsed.error === 'none') {
-        if (/ありがとう|あざす|サンキュー|thanks|助かった/i.test(text)) addBot('<p>礼はいい。次は勝って報告しに来い。</p>');
-        else if (/こんにちは|こんばんは|おはよう|はじめまして|よろしく|やあ|\bhello\b|\bhi\b/i.test(text)) helpBubble('おう、座れ。負けたハンドを見せてみろ。');
+        if (smallTalk(text)) return;
+        if (looksLikeCards(text)) helpBubble('カードが読み取れなかった。');
         else helpBubble('悪いが、ここはバッドビートの相談所だ。負けたハンドの話なら聞くぞ。');
       } else {
         addBot('<p>' + esc(parsed.error) + '</p>');
@@ -977,10 +977,24 @@
   }
   function handLabelHTML(item) { return '<span class="di-hand">' + esc(item.label) + '</span>'; }
 
+  // お礼・あいさつへの返事。返事をしたら true
+  function smallTalk(text) {
+    if (/ありがとう|あざす|サンキュー|thanks|助かった/i.test(text)) { addBot('<p>礼はいい。次は勝って報告しに来い。</p>'); return true; }
+    if (/こんにちは|こんばんは|おはよう|はじめまして|よろしく|やあ|\bhello\b|\bhi\b/i.test(text)) { helpBubble('おう、座れ。負けたハンドを見せてみろ。'); return true; }
+    return false;
+  }
+  // カードを書こうとした形跡があるか（書き方が合わずに読めなかった入力を、雑談と区別する）
+  function looksLikeCards(text) {
+    var t = text.normalize('NFKC');
+    return /vs|対|[♠♥♦♣]|スペード|ハート|ダイヤ|クラブ|スーテッド|オフスート|オールイン|ボード|フロップ|ターン|リバー|プリフロ|負け|割られ|やられ|引かれ|まくられ|ポケット|ペア/i.test(t) ||
+      /(?:^|[^A-Za-z])(?:[2-9TJQKA]|10)(?:[^A-Za-z]|$)/i.test(t);
+  }
+
   function startDaily(text, source) {
     var d = PE.parseDaily(text);
     if (!d.items.length) {
       sendLog({ source: source, text: text, ok: false, error: 'daily_none' });
+      if (smallTalk(text)) return;
       addBot('<p>どの手で負けたのか読めなかった。「KKで5回中3回負けた」みたいに、手と回数を書いてくれ。</p>');
       return;
     }
