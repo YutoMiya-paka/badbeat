@@ -18,4 +18,4 @@ http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
     res.end(body);
   });
-}).listen(5173, () => console.log('http://localhost:5173'));
+}).listen(+process.env.PORT || 5173, function () { console.log('http://localhost:' + this.address().port); });
