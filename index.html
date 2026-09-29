@@ -122,7 +122,9 @@
   }
   .top-text { flex: 1; min-width: 0; }
   .about-short { display: none; }
-  @media (max-width: 420px) { .about-short { display: inline; } }
+  .tone-btn { flex:none; font:inherit; font-size:12px; padding:5px 10px; border-radius:999px; border:1px solid color-mix(in srgb, var(--on-felt) 45%, transparent); background:transparent; color:var(--on-felt); cursor:pointer; white-space:nowrap; }
+  .tone-long { display:inline; } .tone-short { display:none; }
+  @media (max-width: 420px) { .about-short { display: inline; } .tone-long { display:none; } .tone-short { display:inline; } .top { gap:7px; padding-left:10px; padding-right:10px; } .tone-btn,.about-btn { padding:5px 7px; font-size:11px; } }
   .about-btn {
     flex: none;
     font: inherit; font-size: 12px;
@@ -485,6 +487,7 @@
       <h1>バッドビート相談所</h1>
       <p>負けたハンドを書けば、おやっさんが確率だけで判定する</p>
     </div>
+    <button type="button" class="tone-btn" id="toneToggle" aria-pressed="false"><span class="tone-long">口調：荒め</span><span class="tone-short">荒め</span></button>
     <button type="button" class="about-btn" id="aboutOpen" aria-haspopup="dialog" aria-label="このページについて"><span class="about-long">このページについて</span><span class="about-short">説明</span></button>
   </header>
 
@@ -501,7 +504,7 @@
       </section>
       <section>
         <h3>口調について</h3>
-        <p>「おやっさん」の荒っぽい口調はキャラクターの演出です。</p>
+        <p>荒めの口調は演出です。上部のボタンで、やさしめの口調に切り替えられます。</p>
       </section>
       <section>
         <h3>賭けについて</h3>
@@ -578,7 +581,7 @@
   'use strict';
   // ---------- 設定 ----------
   var CONFIG = {
-    APP_VERSION: '1.2.0',
+    APP_VERSION: '1.3.0',
     LOG_ENDPOINT: 'https://script.google.com/macros/s/AKfycbxIEZgditDueEGFRzdc2UGNL9YqSMDN3CsJ1S30ozdiyNqvGewb2i4SGiOZbyvL2klC/exec',   // Apps Script ウェブアプリの /exec URL。空なら記録を送らない
     FEEDBACK_URL: '',   // ご意見の送り先（フォームなどの URL）。空なら表示しない
     LOG_LIMIT: 50       // 1 タブあたりの送信上限
@@ -589,6 +592,17 @@
   var input = document.getElementById('msg');
   var sendBtn = document.getElementById('send');
   var busy = false;
+  var tone = (function () { if (location.hash === '#gentle') return 'gentle'; if (location.hash === '#rough') return 'rough'; try { return localStorage.getItem('badbeat.tone') === 'gentle' ? 'gentle' : 'rough'; } catch (e) { return 'rough'; } })();
+  var toneButton = document.getElementById('toneToggle');
+  function gentle() { return tone === 'gentle'; }
+  function updateToneUI() {
+    var g = gentle();
+    toneButton.setAttribute('aria-pressed', String(g));
+    toneButton.setAttribute('aria-label', '口調を切り替える。現在は' + (g ? 'やさしめ' : '荒め'));
+    toneButton.innerHTML = g ? '<span class="tone-long">口調：やさしめ</span><span class="tone-short">やさしめ</span>' : '<span class="tone-long">口調：荒め</span><span class="tone-short">荒め</span>';
+    document.querySelector('.top-text p').textContent = g ? '負けたハンドを書くと、確率だけで判定します' : '負けたハンドを書けば、おやっさんが確率だけで判定する';
+  }
+  updateToneUI();
 
   // ---------- 表示の部品 ----------
   function esc(s) {
@@ -631,7 +645,7 @@
   function addRow(who, html) {
     var row = document.createElement('div');
     row.className = 'row ' + who;
-    row.innerHTML = (who === 'bot' ? '<div class="avatar" aria-hidden="true">親</div>' : '') +
+    row.innerHTML = (who === 'bot' ? '<div class="avatar" aria-hidden="true">' + (gentle() ? '相' : '親') + '</div>' : '') +
       '<div class="bubble">' + html + '</div>';
     log.appendChild(row);
     scrollEnd();
@@ -715,6 +729,34 @@
     won:    { title: '勝ってるじゃねえか', chip: '確認', color: 'var(--flat)' },
     chop:   { title: 'チョップ（引き分け）', chip: '確認', color: 'var(--flat)' }
   };
+  var LINES_GENTLE = {
+    real: ['{E}で負けたのですね。{odds}回に1回ほどのことです。悔しいお気持ちは自然なことです。', '有利な状況で入って負けた、とてもつらい結果です。判断と結果は分けて考えて大丈夫です。', '数字では{odds}回に1回ほどの負けです。今日は少し休んで、気持ちを整えてください。'],
+    bad: ['{E}で入って負けたのですね。確率で見るとバッドビートです。{odds}回に1回ほど起こります。', '有利な場面で入れていました。今回は結果が伴わなかったのですね。', 'これはバッドビートと呼べる負け方です。{V}に引かれた形です。'],
+    usual: ['{E}は有利ですが、{odds}回に1回ほど負ける勝負です。よくある範囲の負けです。', '有利ではありましたが、相手にも負け筋がありました。大げさに捉えなくて大丈夫です。', '{E}なら勝つ方が多いものの、毎回ではありません。今回は起こりうる負けです。'],
+    flip: ['勝率は{E}で、ほぼ五分です。今回はバッドビートではありません。', '{E}対{V}の勝負でした。どちらにも同じくらい勝つ可能性がありました。', '今回は五分に近い勝負です。結果だけで判断を変えなくて大丈夫です。'],
+    cooler: ['相手の方が強い状況でした。バッドビートではありませんが、つらい負け方ですね。', '勝率は{E}でした。強い手同士がぶつかった、降りにくい場面だったかもしれません。', '印象に残る負け方ですが、負けたことだけで判断が間違いとは言えません。'],
+    sekkyo: ['確率で見るとバッドビートではありません。入った場面を一度振り返ると、次に活かせそうです。勝率は{E}でした。', 'お気持ちは分かりますが、数字は{E}です。どこで降りられたか、落ち着いて振り返ってみましょう。', '不運かどうかと、入った判断は別の話です。今回は判断を振り返る機会にできそうです。'],
+    dead: ['勝率は{E}でした。確率で見るとバッドビートではありません。入った場面を振り返ると、次に活かせそうです。', '{E}で勝つには厳しい状況でした。次回はその場面で他の選択肢も考えてみましょう。', 'オールイン時点で勝ち筋がかなり限られていました。責めずに、入った理由を振り返ってみましょう。'],
+    won: ['このボードでは勝っています。カードの入力を確認してみてください。', 'このボードなら勝ちです。入力に間違いがないかご確認ください。', 'こちらの勝ちになっています。よい知らせでしたら何よりです。'],
+    chop: ['このボードでは引き分けです。負けではありません。', '引き分けでした。ポットを分ける結果です。']
+  };
+  var VERDICT_GENTLE = {
+    real:{title:'とても不運なバッドビート',chip:'共感'}, bad:{title:'バッドビート',chip:'共感'}, usual:{title:'よくある負け',chip:'通常'}, flip:{title:'五分に近い勝負',chip:'五分'}, cooler:{title:'クーラー',chip:'不運'}, sekkyo:{title:'バッドビートではありません',chip:'ふりかえり'}, dead:{title:'バッドビートではありません',chip:'ふりかえり'}, won:{title:'このボードでは勝ち',chip:'確認'}, chop:{title:'引き分け',chip:'確認'}
+  };
+  var DAY_LINES_GENTLE = {
+    worst:['今日はとてもつらい結果でした。同じかそれ以上に負ける日は{odds}日に1日ほどです。ご自身を責めないでください。','数字で見ても、今日は{P}ほどしか起きない負け方でした。少し休んでくださいね。','ここまで厳しい日は珍しいです。{odds}日に1日ほどの確率でした。'],
+    bad:['今日はついていない日でした。同じかそれ以上に負ける確率は{P}です。','{odds}日に1日ほどの厳しい結果です。明日は気持ちを切り替えられますように。','確率から見ても、今日はかなり厳しい日でした。どうかご自身を責めないでください。'],
+    slight:['少しついていない日でした。これくらいの日は{odds}日に1日はあります。','やや悪い結果ですが、よくある範囲です。','今日は少し運が向きませんでした。ひと息ついてくださいね。'],
+    normal:['普通の範囲の日です。これ以上に負ける日も{P}ほどあります。','確率に近い結果です。今日は負けた日ですが、不運とは言い切れません。','特別に珍しい結果ではありません。気持ちを切り替えていきましょう。'],
+    sekkyo:['確率で見るとバッドビートではありません。今日は不運な日ではありませんでした。負けた勝負の入り方を振り返ると、次に活かせそうです。','これ以上に負ける日も{P}ほどあります。運だけでなく、打ち方も穏やかに振り返ってみましょう。','今日は不運な日とは言えません。責めるのではなく、勝負に入った場面を振り返ってみませんか。']
+  };
+  var DAY_VERDICT_GENTLE = { worst:{title:'とても不運な日',chip:'共感'}, bad:{title:'ついていない日',chip:'共感'}, slight:{title:'少しついていない日',chip:'通常'}, normal:{title:'通常の日',chip:'通常'}, sekkyo:{title:'不運な日ではありません',chip:'ふりかえり'} };
+  var ITEM_TAG_GENTLE = {worst:['かなり不運','var(--gold)'],bad:['不運','var(--gold)'],slight:['少し不運','var(--felt)'],normal:['通常','var(--flat)'],sekkyo:['通常範囲','var(--chip)']};
+  toneButton.addEventListener('click', function () {
+    tone = gentle() ? 'rough' : 'gentle'; updateToneUI();
+    try { localStorage.setItem('badbeat.tone', tone); } catch (e) {}
+    addBot(gentle() ? '<p>やさしめの口調に切り替えました。負けたハンドを、落ち着いて一緒に見ていきましょう。</p>' : '<p>おう、いつもの調子に戻すぞ。</p>');
+  });
 
   function isStrongPreflop(hero) {
     var r1 = PE.rankOf(hero[0]), r2 = PE.rankOf(hero[1]);
@@ -752,6 +794,11 @@
       'ポケットペアがフロップでセットになる確率は約11.8%（8.5回に1回）。',
       'AAが配られるのは221回に1回（約0.45%）。'
     ]
+  };
+  var TRIVIA_GENTLE = {
+    favorite:['80%の勝負を5回続けてすべて勝てる確率は、約33%です。','勝率90%の勝負でも、10回行えば1回ほど負けることがあります。','ペア同士のオールインでは、大きいペアが約80%勝ちます。','残り1枚の札をターンかリバーで引かれる確率は約4.3%です。'],
+    flip:['ポケットペア対オーバーカード2枚は、概ね55%対45%です。','コインフリップを5回連続で負ける確率は約3%です。'],
+    under:['フロップのフラッシュドローがリバーまでに完成する確率は約35%です。','フロップの両面待ちストレートドローがリバーまでに完成する確率は約31.5%です。','ポケットペアがフロップでセットになる確率は約11.8%です。','AAが配られるのは221回に1回（約0.45%）です。']
   };
   var lastSingleVerdict = null;
 
@@ -798,9 +845,9 @@
       var heroE = a.win + a.tie / 2;
       if (a.lose >= 0.5) {
         var ho = odds(heroE);
-        out.push(ho ? 'お前が勝てるのは <b>' + ho + '回に1回</b>（' + pct(heroE) + '）。負ける方が普通だ' : 'お前が勝てる札は1枚もなかった');
+        out.push(gentle() ? (ho ? '自分が勝つのは <b>' + ho + '回に1回</b>（' + pct(heroE) + '）です' : '自分が勝つ札はありませんでした') : (ho ? 'お前が勝てるのは <b>' + ho + '回に1回</b>（' + pct(heroE) + '）。負ける方が普通だ' : 'お前が勝てる札は1枚もなかった'));
       } else {
-        out.push(o ? '相手が勝つのは <b>' + o + '回に1回</b>（' + pct(a.lose) + '）' : '相手が勝つ可能性はなかった');
+        out.push(gentle() ? (o ? '相手が勝つのは <b>' + o + '回に1回</b>（' + pct(a.lose) + '）です' : '相手が勝つ可能性はありませんでした') : (o ? '相手が勝つのは <b>' + o + '回に1回</b>（' + pct(a.lose) + '）' : '相手が勝つ可能性はなかった'));
       }
     }
     // 逆転されたストリート
@@ -808,7 +855,7 @@
     for (var i = 1; i < steps.length; i++) {
       var p = steps[i - 1], s = steps[i];
       if (p.win + p.tie / 2 > 0.5 && s.win + s.tie / 2 < 0.5) {
-        out.push(PE.STREET_NAMES[s.street] + 'で逆転された。直前のお前の勝率は <b>' + pct(p.win + p.tie / 2) + '</b>');
+        out.push(gentle() ? PE.STREET_NAMES[s.street] + 'で逆転されました。直前の勝率は <b>' + pct(p.win + p.tie / 2) + '</b>でした' : PE.STREET_NAMES[s.street] + 'で逆転された。直前のお前の勝率は <b>' + pct(p.win + p.tie / 2) + '</b>');
       }
     }
     // リバーの一撃
@@ -817,44 +864,45 @@
       if (turn && turn.win + turn.tie / 2 > 0.5) {
         var r = res.river, n = r.villWins.length;
         var list = r.villWins.slice(0, 12).map(cardText).join(' ') + (n > 12 ? ' ほか' : '');
-        out.push('ターンの時点で相手を救う札は <b>残り' + r.total + '枚中' + n + '枚</b>（' + list + '）。リバーで引かれる確率 <b>' + pct(n / r.total) + '</b>');
+        out.push(gentle() ? 'ターン時点で相手が逆転する札は <b>残り' + r.total + '枚中' + n + '枚</b>（' + list + '）でした。リバーで引かれる確率は <b>' + pct(n / r.total) + '</b>です' : 'ターンの時点で相手を救う札は <b>残り' + r.total + '枚中' + n + '枚</b>（' + list + '）。リバーで引かれる確率 <b>' + pct(n / r.total) + '</b>');
       }
     }
     if (res.final && key !== 'won' && key !== 'chop') {
-      out.push('最後の役：お前は' + PE.CAT_NAMES[res.final.heroCat] + '、相手は' + PE.CAT_NAMES[res.final.villCat]);
+      out.push(gentle() ? '最終的な役：自分は' + PE.CAT_NAMES[res.final.heroCat] + '、相手は' + PE.CAT_NAMES[res.final.villCat] + 'でした' : '最後の役：お前は' + PE.CAT_NAMES[res.final.heroCat] + '、相手は' + PE.CAT_NAMES[res.final.villCat]);
     }
     return out.length ? '<div class="facts">' + out.map(function (x) { return '<span>' + x + '</span>'; }).join('') + '</div>' : '';
   }
 
   function verdictHTML(res, parsed) {
-    var key = classify(res), v = VERDICT[key], a = res.allin;
+    var key = classify(res), v = Object.assign({}, VERDICT[key], gentle() ? VERDICT_GENTLE[key] : {}), lines = gentle() ? LINES_GENTLE : LINES, a = res.allin;
     var E = a.win + a.tie / 2;
     var d = { E: pct(E), V: pct(a.lose), odds: odds(a.lose) || '∞' };
     var line;
-    if (key === 'won' || key === 'chop') { lastSingleVerdict = null; line = pick(LINES[key]); }
+    if (key === 'won' || key === 'chop') { lastSingleVerdict = null; line = pick(lines[key]); }
     else {
       var turn = res.steps.filter(function (s) { return s.street === 4; })[0];
       var turnedAhead = !!(key !== 'sekkyo' && key !== 'dead' && turn &&turn.win + turn.tie / 2 > 0.5 && res.final && res.final.result === 'lose');
       var n = res.river ? res.river.villWins.length : 0;
       if (turnedAhead && res.river && (n === 1 || n === 2)) {
         d.n = n; d.total = res.river.total;
-        line = fill(pick(['ターンの時点で、相手を救う札は残り{total}枚中{n}枚だけだった。それを引かれた。……これは語り継いでいい負け方だ。', '救いの札は{n}枚しかなかった。それが落ちてきたなら、今日はその{n}枚の日だ。お前の打ち方は関係ねえ。']), d);
+        line = fill(pick(gentle() ? ['ターン時点で相手が逆転できる札は、残り{total}枚中{n}枚でした。それを引かれたのですね。とても悔しい結果です。', '逆転の札は{n}枚だけでした。その札を引かれたのですから、つらい負け方です。'] : ['ターンの時点で、相手を救う札は残り{total}枚中{n}枚だけだった。それを引かれた。……これは語り継いでいい負け方だ。', '救いの札は{n}枚しかなかった。それが落ちてきたなら、今日はその{n}枚の日だ。お前の打ち方は関係ねえ。']), d);
       } else if (turnedAhead && n >= 3) {
-        line = pick(['ターンまではお前が前だった。最後の1枚で持っていかれた。……リバーは残酷だな。', 'リバーさえ来なけりゃ勝ってた。その「さえ」がポーカーだ。悔しいのは当然だ。']);
+        line = pick(gentle() ? ['ターンまでは有利でしたが、最後の1枚で逆転されました。悔しい結果ですね。','リバーで結果が変わりました。あと1枚で勝っていたと思うと、つらいですね。'] : ['ターンまではお前が前だった。最後の1枚で持っていかれた。……リバーは残酷だな。', 'リバーさえ来なけりゃ勝ってた。その「さえ」がポーカーだ。悔しいのは当然だ。']);
       } else if (res.spec.street === 0 && PE.rankOf(res.spec.hero[0]) === 12 && PE.rankOf(res.spec.hero[1]) === 12 && PE.rankOf(res.spec.vill[0]) === 11 && PE.rankOf(res.spec.vill[1]) === 11) {
-        line = fill('AAでKKに捕まったなら、胸を張れ。{odds}回に1回の方を引いただけだ。', d);
+        line = fill(gentle() ? 'AAでKKに負けたのですね。{odds}回に1回ほど起こる結果です。' : 'AAでKKに捕まったなら、胸を張れ。{odds}回に1回の方を引いただけだ。', d);
       } else if (res.spec.street === 0 && PE.rankOf(res.spec.hero[0]) === 11 && PE.rankOf(res.spec.hero[1]) === 11 && PE.rankOf(res.spec.vill[0]) === 12 && PE.rankOf(res.spec.vill[1]) === 12) {
-        line = 'KKでAAに当たるのは事故だ。その手でプリフロップに降りろとは、俺も言えねえ。';
-      } else line = fill(pick(LINES[key]), d);
-      if ((key === 'real' || key === 'bad') && (lastSingleVerdict === 'real' || lastSingleVerdict === 'bad')) line += ' 今日は厄日だな。『KKで5回中3回負けた』みたいに書けば、今日1日まとめて見てやるぞ。';
+        line = gentle() ? 'KKでAAに当たるのは厳しい結果です。その手でプリフロップに降りるのは難しい場面だったと思います。' : 'KKでAAに当たるのは事故だ。その手でプリフロップに降りろとは、俺も言えねえ。';
+      } else line = fill(pick(lines[key]), d);
+      if ((key === 'real' || key === 'bad') && (lastSingleVerdict === 'real' || lastSingleVerdict === 'bad')) line += gentle() ? ' 何度か続いた場合は、「KKで5回中3回負けた」のように書くと、今日1日の結果もまとめて確認できます。' : ' 今日は厄日だな。『KKで5回中3回負けた』みたいに書けば、今日1日まとめて見てやるぞ。';
       lastSingleVerdict = key;
     }
 
-    var triviaPool = E >= 0.55 ? TRIVIA.favorite : E >= 0.45 ? TRIVIA.flip : TRIVIA.under;
+    var triviaSet = gentle() ? TRIVIA_GENTLE : TRIVIA;
+    var triviaPool = E >= 0.55 ? triviaSet.favorite : E >= 0.45 ? triviaSet.flip : triviaSet.under;
     var notes = [];
-    if (parsed.autoSuits) notes.push('スートが書かれてなかったので、こっちで割り振った。');
-    if (parsed.streetGuessed && res.spec.board.length) notes.push('オールインした場面が書かれてなかったので、プリフロップとして計算した。');
-    if (!res.final && key !== 'won') notes.push('ボードが最後まで書かれてないので、負けた前提で判定した。');
+    if (parsed.autoSuits) notes.push(gentle() ? 'スートの指定がなかったため、自動で割り当てました。' : 'スートが書かれてなかったので、こっちで割り振った。');
+    if (parsed.streetGuessed && res.spec.board.length) notes.push(gentle() ? 'オールインした場面の指定がなかったため、プリフロップとして計算しました。' : 'オールインした場面が書かれてなかったので、プリフロップとして計算した。');
+    if (!res.final && key !== 'won') notes.push(gentle() ? 'ボードが最後まで記入されていないため、負けた前提で判定しました。' : 'ボードが最後まで書かれてないので、負けた前提で判定した。');
 
     var s = res.spec;
     return '<div class="verdict" style="--c:' + v.color + '">' +
@@ -881,7 +929,7 @@
     logCount++;
     var p = entry.parsed || {};
     var payload = {
-      v: CONFIG.APP_VERSION,
+      v: CONFIG.APP_VERSION + (gentle() ? '-g' : ''),
       source: entry.source,
       ok: !!entry.ok,
       error: entry.error || '',
@@ -916,10 +964,10 @@
   async function judge(parsed, meta) {
     meta = meta || {};
     setBusy(true);
-    var wait = addBot('<span class="typing"><span class="dots"><span></span><span></span><span></span></span><span class="pg">計算中</span></span>');
+    var wait = addBot('<span class="typing"><span class="dots"><span></span><span></span><span></span></span><span class="pg">' + (gentle() ? '計算しています' : '計算中') + '</span></span>');
     var pg = wait.querySelector('.pg');
     try {
-      var res = await PE.analyze(parsed, function (f) { pg.textContent = '全部のボードを数えてる… ' + Math.round(f * 100) + '%'; });
+      var res = await PE.analyze(parsed, function (f) { pg.textContent = (gentle() ? 'すべてのボードを計算しています… ' : '全部のボードを数えてる… ') + Math.round(f * 100) + '%'; });
       wait.querySelector('.bubble').innerHTML = verdictHTML(res, parsed);
       if (meta.log !== false) {
         sendLog({
@@ -929,7 +977,7 @@
         });
       }
     } catch (e) {
-      wait.querySelector('.bubble').innerHTML = '<p>計算中に止まった。もう一回送ってくれ。</p>';
+      wait.querySelector('.bubble').innerHTML = gentle() ? '<p>計算中に問題が起きました。お手数ですが、もう一度お試しください。</p>' : '<p>計算中に止まった。もう一回送ってくれ。</p>';
       if (meta.log !== false) sendLog({ source: meta.source, text: meta.text, ok: false, error: 'calc_failed', parsed: parsed });
     }
     scrollEnd();
@@ -941,6 +989,7 @@
     '<p>書き方：自分の手札 → 相手の手札 → ボードの順。スートは s h d c（♠♥♦♣でもいい）。<code>AhAs vs KdKc</code> のように書く。スートを省いて <code>AA vs KK</code> や <code>AKo</code> <code>AKs</code> でもいい。</p>' +
     '<p>フロップやターンでオールインしたなら「フロップでオールイン」と書いて、そのときのボードも入れてくれ。下の「カード」ボタンから選んでもいい。</p>' +
     '<p>1日まとめての相談もできる。「KKで5回中3回負けた、AKも8回中5回」みたいに、手と回数を書いてくれ。</p>';
+  var HELP_HTML_GENTLE = '<p>負けたハンドを入力してください。確率をもとに判定します。</p><p>書き方：自分の手札 → 相手の手札 → ボードの順です。スートは s h d c（♠♥♦♣でも可）です。<code>AhAs vs KdKc</code> のように入力できます。スートを省略して <code>AA vs KK</code>、<code>AKo</code>、<code>AKs</code> と書くこともできます。</p><p>フロップやターンでオールインした場合は、「フロップでオールイン」のように場面とその時点のボードを入力してください。下の「カード」ボタンから選ぶこともできます。</p><p>1日分をまとめて相談できます。「KKで5回中3回負けた、AKも8回中5回」のように、手と回数を入力してください。</p>';
   var EXAMPLES = [
     'AhAs vs KdKc プリフロでオールイン Qh 7c 2d Ks 9s',
     '72o vs AA',
@@ -951,7 +1000,7 @@
     '今日キングス3回割られた、AKも8回中5回負けた'
   ];
   function helpBubble(intro) {
-    var row = addBot((intro ? '<p>' + intro + '</p>' : '') + HELP_HTML +
+    var row = addBot((intro ? '<p>' + intro + '</p>' : '') + (gentle() ? HELP_HTML_GENTLE : HELP_HTML) +
       '<div class="examples">' + EXAMPLES.map(function (x, i) {
         return '<button type="button" class="ex" data-ex="' + i + '">' + esc(x) + '</button>';
       }).join('') + '</div>');
@@ -977,14 +1026,29 @@
       sendLog({ source: source, text: text, ok: false, error: parsed.error });
       if (parsed.error === 'none') {
         if (smallTalk(text)) return;
-        if (looksLikeCards(text)) helpBubble('カードが読み取れなかった。');
-        else helpBubble('悪いが、ここはバッドビートの相談所だ。負けたハンドの話なら聞くぞ。');
+        if (looksLikeCards(text)) helpBubble(gentle() ? 'カードを読み取れませんでした。入力例をご確認ください。' : 'カードが読み取れなかった。');
+        else helpBubble(gentle() ? 'こちらはバッドビートの相談所です。負けたハンドについてお聞かせください。' : '悪いが、ここはバッドビートの相談所だ。負けたハンドの話なら聞くぞ。');
       } else {
-        addBot('<p>' + esc(parsed.error) + '</p>');
+        addBot('<p>' + esc(gentle() ? gentleParseError(parsed.error) : parsed.error) + '</p>');
       }
       return;
     }
     judge(parsed, { source: source, text: text });
+  }
+  function gentleParseError(e) {
+    if (e === 'none') return 'カードを読み取れませんでした。入力例をご確認ください。';
+    var m;
+    if ((m = e.match(/^「(.+)」が読めなかった。ペアに s（スーテッド）は付かないぞ。$/))) return '「' + m[1] + '」を読み取れませんでした。ペアには s（スーテッド）を付けられません。';
+    if ((m = e.match(/^(自分|相手)の手札が見つからない。.*$/))) return m[1] + 'の手札が見つかりません。2人分の手札を入力してください（例：AhAs vs KdKc）。';
+    if ((m = e.match(/^(自分|相手)の手札が 2 枚そろってない。$/))) return m[1] + 'の手札は2枚そろえて入力してください。';
+    if ((m = e.match(/^ボードが (\d+) 枚ある。多くても 5 枚だ。$/))) return 'ボードは' + m[1] + '枚あります。5枚まで入力できます。';
+    if ((m = e.match(/^(.+) が 2 回出てくる。同じカードは 1 枚しかないぞ。$/))) return '「' + m[1] + '」が重複しています。同じカードは1枚だけ入力できます。';
+    if (e === '自分の手札のカードがボードや相手と重なって作れない。') return '自分の手札のカードが、ボードまたは相手のカードと重複しています。';
+    if (e === '相手の手札のカードが重なって作れない。') return '相手の手札のカードが重複しています。';
+    if (e.indexOf('でオールインなら、そのときのボード') >= 0) return e.replace('でオールインなら、そのときのボード（', 'でオールインした場合は、その時点のボード（').replace(' 枚）も書いてくれ。', '枚）も入力してください。');
+    if (e.indexOf('ボードはスートまで書いてくれ') === 0) return 'ボードはスートまで入力してください（例: Qh 7c 2d）。';
+    if (e === 'ボードは 3 枚（フロップ）から書いてくれ。') return 'ボードは3枚（フロップ）から入力してください。';
+    return e;
   }
 
   // ---------- 1日まとめ ----------
@@ -1002,8 +1066,8 @@
 
   // お礼・あいさつへの返事。返事をしたら true
   function smallTalk(text) {
-    if (/ありがとう|あざす|サンキュー|thanks|助かった/i.test(text)) { addBot('<p>礼はいい。次は勝って報告しに来い。</p>'); return true; }
-    if (/こんにちは|こんばんは|おはよう|はじめまして|よろしく|やあ|\bhello\b|\bhi\b/i.test(text)) { helpBubble('おう、座れ。負けたハンドを見せてみろ。'); return true; }
+    if (/ありがとう|あざす|サンキュー|thanks|助かった/i.test(text)) { addBot(gentle() ? '<p>どういたしまして。いつでもご相談ください。</p>' : '<p>礼はいい。次は勝って報告しに来い。</p>'); return true; }
+    if (/こんにちは|こんばんは|おはよう|はじめまして|よろしく|やあ|\bhello\b|\bhi\b/i.test(text)) { helpBubble(gentle() ? 'こんにちは。負けたハンドを一緒に確認していきましょう。' : 'おう、座れ。負けたハンドを見せてみろ。'); return true; }
     return false;
   }
   // カードを書こうとした形跡があるか（書き方が合わずに読めなかった入力を、雑談と区別する）
@@ -1018,7 +1082,7 @@
     if (!d.items.length) {
       sendLog({ source: source, text: text, ok: false, error: 'daily_none' });
       if (smallTalk(text)) return;
-      addBot('<p>どの手で負けたのか読めなかった。「KKで5回中3回負けた」みたいに、手と回数を書いてくれ。</p>');
+      addBot(gentle() ? '<p>どの手で負けたか読み取れませんでした。「KKで5回中3回負けた」のように、手と回数を入力してください。</p>' : '<p>どの手で負けたのか読めなかった。「KKで5回中3回負けた」みたいに、手と回数を書いてくれ。</p>');
       return;
     }
     daily = { items: d.items, text: text, source: source, asking: null };
@@ -1031,9 +1095,9 @@
       if (it.skip || (it.n !== null && it.k !== null)) continue;
       daily.asking = i;
       var q = it.k === null
-        ? handLabelHTML(it) + 'で何回オールインして、何回負けた？（例：5回中3回）'
-        : handLabelHTML(it) + 'は、全部で何回オールインした？ 負けは' + it.k + '回と聞いてる。（全部負けなら「全部」）';
-      addBot('<p>' + q + '</p><p class="note">分からなければ「わからない」でいい。その手は外して計算する。</p>');
+        ? handLabelHTML(it) + (gentle() ? 'で何回オールインして、何回負けましたか？（例：5回中3回）' : 'で何回オールインして、何回負けた？（例：5回中3回）')
+        : handLabelHTML(it) + (gentle() ? 'は、全部で何回オールインしましたか？ 負けは' + it.k + '回と伺っています。（全部負けなら「全部」と入力してください）' : 'は、全部で何回オールインした？ 負けは' + it.k + '回と聞いてる。（全部負けなら「全部」）');
+      addBot('<p>' + q + '</p><p class="note">' + (gentle() ? '分からない場合は「わからない」と入力できます。その手は計算から外します。' : '分からなければ「わからない」でいい。その手は外して計算する。') + '</p>');
       return;
     }
     daily.asking = null;
@@ -1056,13 +1120,13 @@
     if (it.k === null) {
       var r = PE.parseDaily(it.label + ' ' + text).items[0];
       if (r && r.n !== null && r.k !== null) {
-        if (r.k > r.n) { addBot('<p>負けた回数がオールインの回数より多いぞ。もう一回書いてくれ。</p>'); return true; }
+        if (r.k > r.n) { addBot(gentle() ? '<p>負けた回数がオールインの回数を上回っています。もう一度入力してください。</p>' : '<p>負けた回数がオールインの回数より多いぞ。もう一回書いてくれ。</p>'); return true; }
         it.n = r.n; it.k = r.k;
         askNext();
         return true;
       }
       if (firstNumber(text) !== null) {
-        addBot('<p>回数を2つ教えてくれ。「5回中3回」みたいに。</p>');
+        addBot(gentle() ? '<p>回数を2つ入力してください。「5回中3回」のようにお願いします。</p>' : '<p>回数を2つ教えてくれ。「5回中3回」みたいに。</p>');
         return true;
       }
       daily = null;
@@ -1070,8 +1134,8 @@
     }
     var n = firstNumber(text);
     if (n === null) { daily = null; return false; }
-    if (n < it.k) { addBot('<p>負けが' + it.k + '回なら、オールインは' + it.k + '回以上のはずだ。もう一回教えてくれ。</p>'); return true; }
-    if (n > 300) { addBot('<p>さすがに多すぎる。1日のオールインの回数を教えてくれ。</p>'); return true; }
+    if (n < it.k) { addBot(gentle() ? '<p>負けが' + it.k + '回の場合、オールイン回数は' + it.k + '回以上になります。もう一度入力してください。</p>' : '<p>負けが' + it.k + '回なら、オールインは' + it.k + '回以上のはずだ。もう一回教えてくれ。</p>'); return true; }
+    if (n > 300) { addBot(gentle() ? '<p>回数が多すぎるようです。1日のオールイン回数を確認して入力してください。</p>' : '<p>さすがに多すぎる。1日のオールインの回数を教えてくれ。</p>'); return true; }
     it.n = n;
     askNext();
     return true;
@@ -1122,52 +1186,52 @@
     var d = daily;
     daily = null;
     setBusy(true);
-    var wait = addBot('<span class="typing"><span class="dots"><span></span><span></span><span></span></span><span>1日分を計算中</span></span>');
+    var wait = addBot('<span class="typing"><span class="dots"><span></span><span></span><span></span></span><span>' + (gentle() ? '1日分を計算しています' : '1日分を計算中') + '</span></span>');
     await new Promise(function (r) { setTimeout(r, 30); });
     try {
       var rows = [], list = [], K = 0, usesRange = false;
       d.items.forEach(function (it) {
         if (it.skip) {
-          rows.push('<div class="day-item"><div class="di-head">' + handLabelHTML(it) + '</div><span class="di-skip">回数が分からないので外した</span></div>');
+          rows.push('<div class="day-item"><div class="di-head">' + handLabelHTML(it) + '</div><span class="di-skip">' + (gentle() ? '回数が分からないため、計算から外しました' : '回数が分からないので外した') + '</span></div>');
           return;
         }
         var he = PE.handEquity(it.hero, it.vill, 30000);
         var p = he.lose + he.tie / 2;
         var tail = PE.binomTail(it.n, it.k, p);
-        var tag = ITEM_TAG[dayBand(tail)];
+        var tag = (gentle() ? ITEM_TAG_GENTLE : ITEM_TAG)[dayBand(tail)];
         if (!it.vill) usesRange = true;
         list.push({ n: it.n, p: p });
         K += it.k;
         rows.push('<div class="day-item"><div class="di-head">' + handLabelHTML(it) +
           '<span class="di-vs">' + (it.vill ? 'vs ' + esc(classLabel(it.vill)) : 'vs よくある相手の手') + '</span>' +
           '<span class="di-tag" style="--t:' + tag[1] + '">' + tag[0] + '</span></div>' +
-          '<div class="di-nums">' + it.n + '回中 <b>' + it.k + '回負け</b>。1回あたり負ける確率 <b>' + pct(p) + '</b>、普通なら <b>' + (it.n * p).toFixed(1) + '回</b></div>' +
-          '<div class="di-tail">これ以上負ける確率 <b>' + pct(tail) + '</b></div></div>');
+          '<div class="di-nums">' + it.n + '回中 <b>' + it.k + '回負け</b>。1回あたり負ける確率 <b>' + pct(p) + '</b>、' + (gentle() ? '期待される負け数は ' : '普通なら ') + '<b>' + (it.n * p).toFixed(1) + '回</b>' + (gentle() ? 'です。' : '') + '</div>' +
+          '<div class="di-tail">' + (gentle() ? 'これ以上負ける確率は ' : 'これ以上負ける確率 ') + '<b>' + pct(tail) + '</b>' + (gentle() ? 'です。' : '') + '</div></div>');
       });
       if (!list.length) {
-        wait.querySelector('.bubble').innerHTML = '<p>回数が分かる勝負が1つもないから、計算できなかった。</p>';
+        wait.querySelector('.bubble').innerHTML = gentle() ? '<p>回数が分かる勝負がなかったため、計算できませんでした。</p>' : '<p>回数が分かる勝負が1つもないから、計算できなかった。</p>';
       } else {
         var tAll = PE.sumTail(list, K);
-        var band = dayBand(tAll), v = DAY_VERDICT[band];
+        var band = dayBand(tAll), v = Object.assign({}, DAY_VERDICT[band], gentle() ? DAY_VERDICT_GENTLE[band] : {});
         var data = { P: pct(tAll), odds: odds(tAll) || '∞' };
         var nTotal = list.reduce(function (a, x) { return a + x.n; }, 0);
         wait.querySelector('.bubble').innerHTML =
           '<div class="verdict" style="--c:' + v.color + '">' +
           '<div class="v-head"><span class="v-chip">' + v.chip + '</span><span class="v-title">' + v.title + '</span></div>' +
-          '<div class="luck"><span class="luck-label">今日と同じか、もっと悪い負け方になる確率</span>' +
+          '<div class="luck"><span class="luck-label">' + (gentle() ? '今日と同じか、それ以上に負ける確率' : '今日と同じか、もっと悪い負け方になる確率') + '</span>' +
             '<span class="luck-num">' + pct(tAll) + '</span>' +
-            '<span class="luck-sub">オールイン ' + nTotal + '回で ' + K + '回負け' + (odds(tAll) ? '（' + odds(tAll) + '日に1日の負け方）' : '') + '</span></div>' +
-          '<p class="v-line">' + fill(pick(DAY_LINES[band]), data) + '</p>' +
+            '<span class="luck-sub">オールイン ' + nTotal + '回で ' + K + '回負け' + (odds(tAll) ? (gentle() ? '（' + odds(tAll) + '日に1日ほど）' : '（' + odds(tAll) + '日に1日の負け方）') : '') + '</span></div>' +
+          '<p class="v-line">' + fill(pick((gentle() ? DAY_LINES_GENTLE : DAY_LINES)[band]), data) + '</p>' +
           '<div class="day-list">' + rows.join('') + '</div>' +
           (usesRange
-            ? '<p class="note">相手の手が書かれていない勝負は、オールインに付き合ってくる典型的な手（' + esc(PE.DEFAULT_RANGE.text) + '）を相手に、プリフロップでオールインした前提で計算した。</p>'
-            : '<p class="note">プリフロップでオールインした前提で計算した。</p>') +
-          '<p class="trivia">' + pick(TRIVIA.favorite) + '</p>' +
+            ? '<p class="note">' + (gentle() ? '相手の手が未入力の勝負は、オールインに応じる典型的な手（' + esc(PE.DEFAULT_RANGE.text) + '）を相手に、プリフロップでオールインした前提で計算しました。' : '相手の手が書かれていない勝負は、オールインに付き合ってくる典型的な手（' + esc(PE.DEFAULT_RANGE.text) + '）を相手に、プリフロップでオールインした前提で計算した。') + '</p>'
+            : '<p class="note">' + (gentle() ? 'プリフロップでオールインした前提で計算しました。' : 'プリフロップでオールインした前提で計算した。') + '</p>') +
+          '<p class="trivia">' + pick((gentle() ? TRIVIA_GENTLE : TRIVIA).favorite) + '</p>' +
           '</div>';
       }
       sendLog({ source: d.source, text: d.text, ok: !!list.length, error: list.length ? '' : 'daily_nocount', verdict: 'daily' });
     } catch (e) {
-      wait.querySelector('.bubble').innerHTML = '<p>計算中に止まった。もう一回送ってくれ。</p>';
+      wait.querySelector('.bubble').innerHTML = gentle() ? '<p>計算中に問題が起きました。お手数ですが、もう一度お試しください。</p>' : '<p>計算中に止まった。もう一回送ってくれ。</p>';
       sendLog({ source: d.source, text: d.text, ok: false, error: 'daily_failed' });
     }
     scrollEnd();
@@ -1284,17 +1348,17 @@
     var err = document.getElementById('pkError');
     var sl = pk.slots;
     function has(k) { return sl[k] !== undefined; }
-    if (!has('h0') || !has('h1')) { err.textContent = '自分の手札を2枚選んでくれ'; return; }
-    if (!has('v0') || !has('v1')) { err.textContent = '相手の手札を2枚選んでくれ'; return; }
+    if (!has('h0') || !has('h1')) { err.textContent = gentle() ? '自分の手札を2枚選んでください' : '自分の手札を2枚選んでくれ'; return; }
+    if (!has('v0') || !has('v1')) { err.textContent = gentle() ? '相手の手札を2枚選んでください' : '相手の手札を2枚選んでくれ'; return; }
     var board = [];
     for (var i = 0; i < 5; i++) {
       if (has('b' + i)) {
-        if (board.length !== i) { err.textContent = 'ボードは左から順に埋めてくれ'; return; }
+        if (board.length !== i) { err.textContent = gentle() ? 'ボードは左から順に選んでください' : 'ボードは左から順に埋めてくれ'; return; }
         board.push(sl['b' + i]);
       }
     }
-    if (board.length === 1 || board.length === 2) { err.textContent = 'ボードは3枚（フロップ）から選んでくれ'; return; }
-    if (board.length < pk.street) { err.textContent = PE.STREET_NAMES[pk.street] + 'でオールインなら、そのときのボードも選んでくれ'; return; }
+    if (board.length === 1 || board.length === 2) { err.textContent = gentle() ? 'ボードは3枚（フロップ）から選んでください' : 'ボードは3枚（フロップ）から選んでくれ'; return; }
+    if (board.length < pk.street) { err.textContent = gentle() ? PE.STREET_NAMES[pk.street] + 'でオールインした場合は、その時点のボードも選んでください' : PE.STREET_NAMES[pk.street] + 'でオールインなら、そのときのボードも選んでくれ'; return; }
     err.textContent = '';
     var spec = { hero: [sl.h0, sl.h1], vill: [sl.v0, sl.v1], board: board, street: pk.street, autoSuits: false, streetGuessed: false };
     var txt = cardText(sl.h0) + cardText(sl.h1) + ' vs ' + cardText(sl.v0) + cardText(sl.v1) +
@@ -1324,13 +1388,13 @@
   about.addEventListener('click', function (e) { if (e.target === about) about.close(); });
 
   // ---------- 最初の画面 ----------
-  helpBubble('よう。バッドビートを食らったか？');
+  helpBubble(gentle() ? 'こんにちは。バッドビートかどうか、一緒に確認していきましょう。' : 'よう。バッドビートを食らったか？');
   addTag('例');
   var sample = EXAMPLES[0];
   addUser(sample);
   judge(PE.parse(sample), { log: false }).then(function () {
     lastSingleVerdict = null; // 見本は連続判定に数えない
-    addTag('ここから下が、お前の相談');
+    addTag(gentle() ? 'ここから下が、ご相談です' : 'ここから下が、お前の相談');
   });
 })();
 </script>
