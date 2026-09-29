@@ -1,0 +1,14 @@
+{
+  "name": "badbeat",
+  "private": true,
+  "description": "バッドビート相談所のテスト用（公開ページには使わない）",
+  "scripts": {
+    "setup": "node tools/pw-install.js",
+    "test": "node tools/test-engine.js && node tools/test-apps-script.js && playwright test",
+    "test:unit": "node tools/test-engine.js && node tools/test-apps-script.js",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0"
+  }
+}
