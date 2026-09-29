@@ -595,7 +595,7 @@
   'use strict';
   // ---------- 設定 ----------
   var CONFIG = {
-    APP_VERSION: '1.3.0',
+    APP_VERSION: '1.3.1',
     LOG_ENDPOINT: 'https://script.google.com/macros/s/AKfycbxIEZgditDueEGFRzdc2UGNL9YqSMDN3CsJ1S30ozdiyNqvGewb2i4SGiOZbyvL2klC/exec',   // Apps Script ウェブアプリの /exec URL。空なら記録を送らない
     FEEDBACK_URL: '',   // ご意見の送り先（フォームなどの URL）。空なら表示しない
     LOG_LIMIT: 50       // 1 タブあたりの送信上限
@@ -826,6 +826,10 @@
     under:['フロップのフラッシュドローがリバーまでに完成する確率は約35%です。','フロップの両面待ちストレートドローがリバーまでに完成する確率は約31.5%です。','ポケットペアがフロップでセットになる確率は約11.8%です。','AAが配られるのは221回に1回（約0.45%）です。']
   };
   var lastSingleVerdict = null;
+  // 1 ハンドの判定で負け（won・chop 以外）が続いた回数。見本と 1 日まとめは数えない。保存しない
+  var lossStreak = 0;
+  // 荒め口調で説教を初めて受けたときに、やさしめがあることを 1 回だけ案内する
+  var toneHintShown = (function () { try { return localStorage.getItem('badbeat.toneHint') === '1'; } catch (e) { return false; } })();
 
   function eqBlock(step, label) {
     var h = step.win * 100, t = step.tie * 100, v = step.lose * 100;
@@ -899,28 +903,41 @@
     return out.length ? '<div class="facts">' + out.map(function (x) { return '<span>' + x + '</span>'; }).join('') + '</div>' : '';
   }
 
-  function verdictHTML(res, parsed) {
+  // opts.sample: 起動時の見本の判定（連続負け・案内の対象にしない）
+  function verdictHTML(res, parsed, opts) {
+    var sample = !!(opts && opts.sample);
+    var extra = [];
     var key = classify(res), v = Object.assign({}, VERDICT[key], gentle() ? VERDICT_GENTLE[key] : {}), lines = gentle() ? LINES_GENTLE : LINES, a = res.allin;
     var E = a.win + a.tie / 2;
     var d = { E: pct(E), V: pct(a.lose), odds: odds(a.lose) || '∞' };
     var line;
-    if (key === 'won' || key === 'chop') { lastSingleVerdict = null; line = pick(lines[key]); }
+    if (key === 'won' || key === 'chop') { lastSingleVerdict = null; if (!sample) lossStreak = 0; line = pick(lines[key]); }
     else {
       var turn = res.steps.filter(function (s) { return s.street === 4; })[0];
       var turnedAhead = !!(key !== 'sekkyo' && key !== 'dead' && turn &&turn.win + turn.tie / 2 > 0.5 && res.final && res.final.result === 'lose');
       var n = res.river ? res.river.villWins.length : 0;
       if (turnedAhead && res.river && (n === 1 || n === 2)) {
         d.n = n; d.total = res.river.total;
-        line = fill(pick(gentle() ? ['ターン時点で相手が逆転できる札は、残り{total}枚中{n}枚でした。それを引かれたのですね。とても悔しい結果です。', '逆転の札は{n}枚だけでした。その札を引かれたのですから、つらい負け方です。'] : ['ターンの時点で、相手を救う札は残り{total}枚中{n}枚だけだった。それを引かれた。……これは語り継いでいい負け方だ。', '救いの札は{n}枚しかなかった。それが落ちてきたなら、今日はその{n}枚の日だ。お前の打ち方は関係ねえ。']), d);
+        line = fill(pick(gentle() ? ['ターン時点で相手が逆転できる札は、残り{total}枚中{n}枚でした。それを引かれたのですね。リバーの1枚は、打ち方では防げません。', '逆転の札は{n}枚だけでした。打ち方の問題ではありません。とてもつらい負け方ですね。'] : ['ターンの時点で、相手を救う札は残り{total}枚中{n}枚だけだった。それを引かれた。……これは語り継いでいい負け方だ。', '救いの札は{n}枚しかなかった。それが落ちてきたなら、今日はその{n}枚の日だ。お前の打ち方は関係ねえ。']), d);
       } else if (turnedAhead && n >= 3) {
-        line = pick(gentle() ? ['ターンまでは有利でしたが、最後の1枚で逆転されました。悔しい結果ですね。','リバーで結果が変わりました。あと1枚で勝っていたと思うと、つらいですね。'] : ['ターンまではお前が前だった。最後の1枚で持っていかれた。……リバーは残酷だな。', 'リバーさえ来なけりゃ勝ってた。その「さえ」がポーカーだ。悔しいのは当然だ。']);
+        line = pick(gentle() ? ['ターンまでは有利でしたが、最後の1枚で逆転されました。最後の1枚は、打ち方では防げません。悔しい結果ですね。', 'リバーで結果が変わりました。あと1枚で勝っていたと思うと、つらいですね。結果が変わっても、そこまでの打ち方が悪かったわけではありません。'] : ['ターンまではお前が前だった。最後の1枚で持っていかれた。……リバーは残酷だな。', 'リバーさえ来なけりゃ勝ってた。その「さえ」がポーカーだ。悔しいのは当然だ。']);
       } else if (res.spec.street === 0 && PE.rankOf(res.spec.hero[0]) === 12 && PE.rankOf(res.spec.hero[1]) === 12 && PE.rankOf(res.spec.vill[0]) === 11 && PE.rankOf(res.spec.vill[1]) === 11) {
-        line = fill(gentle() ? 'AAでKKに負けたのですね。{odds}回に1回ほど起こる結果です。' : 'AAでKKに捕まったなら、胸を張れ。{odds}回に1回の方を引いただけだ。', d);
+        line = fill(gentle() ? 'AAでKKに負けたのですね。オールインした判断は正しかったです。{odds}回に1回ほど起こる結果です。' : 'AAでKKに捕まったなら、胸を張れ。{odds}回に1回の方を引いただけだ。', d);
       } else if (res.spec.street === 0 && PE.rankOf(res.spec.hero[0]) === 11 && PE.rankOf(res.spec.hero[1]) === 11 && PE.rankOf(res.spec.vill[0]) === 12 && PE.rankOf(res.spec.vill[1]) === 12) {
         line = gentle() ? 'KKでAAに当たるのは厳しい結果です。その手でプリフロップに降りるのは難しい場面だったと思います。' : 'KKでAAに当たるのは事故だ。その手でプリフロップに降りろとは、俺も言えねえ。';
       } else line = fill(pick(lines[key]), d);
-      if ((key === 'real' || key === 'bad') && (lastSingleVerdict === 'real' || lastSingleVerdict === 'bad')) line += gentle() ? ' 何度か続いた場合は、「KKで5回中3回負けた」のように書くと、今日1日の結果もまとめて確認できます。' : ' 今日は厄日だな。『KKで5回中3回負けた』みたいに書けば、今日1日まとめて見てやるぞ。';
+      if (!sample) lossStreak++;
+      // 休憩の声かけはやさしめ口調だけ（ユーザー指定）
+      var restNow = gentle() && !sample && lossStreak > 0 && lossStreak % 3 === 0;
+      if (restNow) {
+        extra.push('続けて負けが入っていますね。少し席を立って、水を飲むなどして休憩しませんか。落ち着いてからの方が、判断もしやすくなります。');
+      } else if ((key === 'real' || key === 'bad') && (lastSingleVerdict === 'real' || lastSingleVerdict === 'bad')) line += gentle() ? ' 何度か続いた場合は、「KKで5回中3回負けた」のように書くと、今日1日の結果もまとめて確認できます。' : ' 今日は厄日だな。『KKで5回中3回負けた』みたいに書けば、今日1日まとめて見てやるぞ。';
       lastSingleVerdict = key;
+      if (!sample && !gentle() && !toneHintShown && (key === 'sekkyo' || key === 'dead')) {
+        toneHintShown = true;
+        try { localStorage.setItem('badbeat.toneHint', '1'); } catch (e) {}
+        extra.push('口調は右上のボタンで「やさしめ」にも変えられるぞ。');
+      }
     }
 
     var triviaSet = gentle() ? TRIVIA_GENTLE : TRIVIA;
@@ -940,6 +957,7 @@
       '</div>' +
       eqBlock(a, PE.STREET_NAMES[s.street] + 'でオールインした時点') +
       '<p class="v-line">' + line + '</p>' +
+      extra.map(function (x) { return '<p class="note">' + x + '</p>'; }).join('') +
       '<details class="verdict-details"' + (window.matchMedia('(max-width: 420px)').matches ? '' : ' open') + '><summary>くわしく見る</summary>' +
       factsBlock(res, key) +
       timelineBlock(res) +
@@ -996,7 +1014,7 @@
     var pg = wait.querySelector('.pg');
     try {
       var res = await PE.analyze(parsed, function (f) { pg.textContent = (gentle() ? 'すべてのボードを計算しています… ' : '全部のボードを数えてる… ') + Math.round(f * 100) + '%'; });
-      wait.querySelector('.bubble').innerHTML = verdictHTML(res, parsed);
+      wait.querySelector('.bubble').innerHTML = verdictHTML(res, parsed, { sample: meta.log === false });
       if (meta.log !== false) {
         sendLog({
           source: meta.source, text: meta.text, ok: true, parsed: parsed,
