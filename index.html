@@ -429,7 +429,20 @@
   .key:disabled { opacity: .3; cursor: default; }
   .key.s0 { color: var(--s0); } .key.s1 { color: var(--s1); }
   .key.s2 { color: var(--s2); } .key.s3 { color: var(--s3); }
-  .pk-suits .key { font-size: 20px; background: var(--card); }
+  .pk-suits .key { font-size: 18px; background: var(--card); }
+  /* 使用済みのマークは面を薄くせず、文字色だけ補足色に（ダークで灰色の四角にならないように） */
+  .pk-suits .key:disabled { opacity: 1; color: var(--muted); }
+  .pk-step { margin: 0; font-size: 12px; line-height: 20px; color: var(--muted); }
+  .pk-suit-wait {
+    margin: 0;
+    min-height: 42px;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px dashed var(--line);
+    border-radius: 5px;
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+  }
   .pk-actions { display: flex; align-items: center; gap: 10px; }
   .pk-error { flex: 1; font-size: 12px; color: var(--chip); }
 
@@ -570,8 +583,10 @@
         <button type="button" role="radio" id="st-4" data-street="4" aria-checked="false">ターン</button>
       </div>
     </div>
+    <p class="pk-step" id="pkStep" aria-live="polite"></p>
     <div class="pk-ranks" id="pkRanks"></div>
-    <div class="pk-suits" id="pkSuits"></div>
+    <div class="pk-suits" id="pkSuits" hidden></div>
+    <p class="pk-suit-wait" id="pkSuitWait">数字を選ぶと、ここでマークを選べます</p>
     <div class="pk-actions">
       <button type="button" class="btn ghost" id="pkClear">クリア</button>
       <span class="pk-error" id="pkError" role="status"></span>
@@ -598,7 +613,7 @@
   'use strict';
   // ---------- 設定 ----------
   var CONFIG = {
-    APP_VERSION: '1.4.0',
+    APP_VERSION: '1.4.1',
     LOG_ENDPOINT: 'https://script.google.com/macros/s/AKfycbxIEZgditDueEGFRzdc2UGNL9YqSMDN3CsJ1S30ozdiyNqvGewb2i4SGiOZbyvL2klC/exec',   // Apps Script ウェブアプリの /exec URL。空なら記録を送らない
     FEEDBACK_URL: '',   // ご意見の送り先（フォームなどの URL）。空なら表示しない
     LOG_LIMIT: 50       // 1 タブあたりの送信上限
@@ -1343,7 +1358,6 @@
     var sb = document.createElement('button');
     sb.type = 'button'; sb.className = 'key s' + s; sb.id = 'su-' + s; sb.dataset.suit = s;
     sb.textContent = PE.SUIT_SYM[s];
-    sb.setAttribute('aria-label', ['スペード', 'ハート', 'ダイヤ', 'クラブ'][s]);
     suitsEl.appendChild(sb);
   }
 
@@ -1365,9 +1379,20 @@
       b.disabled = full;
       b.setAttribute('aria-pressed', String(pk.rank === rr));
     });
+    // ① 数字 → ② マーク の順を見せる。数字を選ぶまではマークのボタンを出さない
+    var slotName = document.getElementById('slot-' + pk.active).getAttribute('aria-label');
+    document.getElementById('pkStep').textContent = pk.rank === null
+      ? '① 数字を選ぶ（' + slotName + '）'
+      : '② ' + rankLabel(pk.rank) + ' のマークを選ぶ（' + slotName + '）';
+    suitsEl.hidden = pk.rank === null;
+    document.getElementById('pkSuitWait').hidden = pk.rank !== null;
     suitsEl.querySelectorAll('.key').forEach(function (b) {
       var ss = +b.dataset.suit;
       b.disabled = pk.rank === null || u[PE.makeCard(pk.rank, ss)] !== undefined;
+      if (pk.rank !== null) {
+        b.textContent = rankLabel(pk.rank) + PE.SUIT_SYM[ss];
+        b.setAttribute('aria-label', rankLabel(pk.rank) + ' ' + ['スペード', 'ハート', 'ダイヤ', 'クラブ'][ss]);
+      }
     });
     document.querySelectorAll('#pkStreet button').forEach(function (b) {
       b.setAttribute('aria-checked', String(+b.dataset.street === pk.street));
@@ -1435,6 +1460,8 @@
     var spec = { hero: [sl.h0, sl.h1], vill: [sl.v0, sl.v1], board: board, street: pk.street, autoSuits: false, streetGuessed: false };
     var txt = cardText(sl.h0) + cardText(sl.h1) + ' vs ' + cardText(sl.v0) + cardText(sl.v1) +
       (board.length ? '  ボード ' + board.map(cardText).join(' ') : '') + '（' + PE.STREET_NAMES[pk.street] + 'でオールイン）';
+    // 判定を送ったらカード欄を閉じる（選んだカードは残す）。閉じてから吹き出しを足し、結果の位置合わせをする
+    setPicker(false);
     addUser(txt);
     daily = null;
     judge(spec, { source: 'picker', text: txt });
