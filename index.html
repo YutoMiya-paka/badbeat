@@ -34,6 +34,7 @@
     --hero: #0E5A43;
     --hero-ink: #0E5A43;
     --ring: #0E5A43;
+    --good: #0E5A43;
     --card: #FFFFFF;
     --card-line: #C9D1CC;
     --s0: #1B1F1D;
@@ -65,6 +66,7 @@
       --hero: #2E9A74;
       --hero-ink: #E6EEE9;
       --ring: #D9AE45;
+      --good: #3FAE85;
       --card: #F3F4EF;
       --card-line: #3A4A42;
     }
@@ -89,6 +91,7 @@
     --hero: #2E9A74;
     --hero-ink: #E6EEE9;
     --ring: #D9AE45;
+    --good: #3FAE85;
     --card: #F3F4EF;
     --card-line: #3A4A42;
   }
@@ -584,7 +587,7 @@
   <div class="cardbar" id="cardbar" hidden><button type="button" id="cardbarBtn">カードで選ぶ</button><span>カード欄を開く</span></div>
   <form id="composer" class="composer" autocomplete="off">
     <button type="button" class="btn ghost" id="pickerToggle" aria-expanded="false" aria-controls="picker">カード</button>
-    <input id="msg" type="text" enterkeyhint="send" placeholder="AA vs KK と書くか、カードで選ぶ" aria-label="負けたハンドを書く">
+    <input id="msg" type="text" enterkeyhint="send" placeholder="例: AA vs KK" aria-label="負けたハンドを書く">
     <button type="submit" class="btn" id="send">送信</button>
   </form>
 </div>
@@ -595,7 +598,7 @@
   'use strict';
   // ---------- 設定 ----------
   var CONFIG = {
-    APP_VERSION: '1.3.1',
+    APP_VERSION: '1.4.0',
     LOG_ENDPOINT: 'https://script.google.com/macros/s/AKfycbxIEZgditDueEGFRzdc2UGNL9YqSMDN3CsJ1S30ozdiyNqvGewb2i4SGiOZbyvL2klC/exec',   // Apps Script ウェブアプリの /exec URL。空なら記録を送らない
     FEEDBACK_URL: '',   // ご意見の送り先（フォームなどの URL）。空なら表示しない
     LOG_LIMIT: 50       // 1 タブあたりの送信上限
@@ -660,7 +663,8 @@
   function alignVerdict(row) {
     requestAnimationFrame(function () {
       requestAnimationFrame(function () {
-        if (row.offsetHeight > log.clientHeight) {
+        // 会話ログの上下の余白（16px×2）を引いた高さに収まらなければ、行の頭に合わせる
+        if (row.offsetHeight > log.clientHeight - 32) {
           var lr = log.getBoundingClientRect(), rr = row.getBoundingClientRect();
           log.scrollTop += rr.top - lr.top - 8;
         } else scrollEnd();
@@ -746,7 +750,7 @@
   var VERDICT = {
     real:   { title: '本物のバッドビート', chip: '同情', color: 'var(--gold)' },
     bad:    { title: 'バッドビート',       chip: '同情', color: 'var(--gold)' },
-    usual:  { title: 'よくある負け',       chip: '普通', color: 'var(--felt)' },
+    usual:  { title: 'よくある負け',       chip: '普通', color: 'var(--good)' },
     flip:   { title: 'コインフリップ',     chip: '五分', color: 'var(--flat)' },
     cooler: { title: 'クーラー',           chip: '不運', color: 'var(--blue)' },
     sekkyo: { title: 'バッドビートじゃねえ', chip: '説教', color: 'var(--chip)' },
@@ -776,7 +780,7 @@
     sekkyo:['確率で見るとバッドビートではありません。今日は不運な日ではありませんでした。負けた勝負の入り方を振り返ると、次に活かせそうです。','これ以上に負ける日も{P}ほどあります。運だけでなく、打ち方も穏やかに振り返ってみましょう。','今日は不運な日とは言えません。責めるのではなく、勝負に入った場面を振り返ってみませんか。']
   };
   var DAY_VERDICT_GENTLE = { worst:{title:'とても不運な日',chip:'共感'}, bad:{title:'ついていない日',chip:'共感'}, slight:{title:'少しついていない日',chip:'通常'}, normal:{title:'通常の日',chip:'通常'}, sekkyo:{title:'不運な日ではありません',chip:'ふりかえり'} };
-  var ITEM_TAG_GENTLE = {worst:['かなり不運','var(--gold)'],bad:['不運','var(--gold)'],slight:['少し不運','var(--felt)'],normal:['通常','var(--flat)'],sekkyo:['通常範囲','var(--chip)']};
+  var ITEM_TAG_GENTLE = {worst:['かなり不運','var(--gold)'],bad:['不運','var(--gold)'],slight:['少し不運','var(--good)'],normal:['通常','var(--flat)'],sekkyo:['通常範囲','var(--chip)']};
   toneButton.addEventListener('click', function () {
     tone = gentle() ? 'rough' : 'gentle'; updateToneUI();
     try { localStorage.setItem('badbeat.tone', tone); } catch (e) {}
@@ -1212,13 +1216,13 @@
   var DAY_VERDICT = {
     worst:  { title: '歴史的に不運な日', chip: '同情', color: 'var(--gold)' },
     bad:    { title: 'ついてない日', chip: '同情', color: 'var(--gold)' },
-    slight: { title: 'ちょっとついてない日', chip: '普通', color: 'var(--felt)' },
+    slight: { title: 'ちょっとついてない日', chip: '普通', color: 'var(--good)' },
     normal: { title: '普通の日', chip: '普通', color: 'var(--flat)' },
     sekkyo: { title: '不運じゃねえ', chip: '説教', color: 'var(--chip)' }
   };
   function dayBand(t) { return t < 0.01 ? 'worst' : t < 0.05 ? 'bad' : t < 0.2 ? 'slight' : t < 0.5 ? 'normal' : 'sekkyo'; }
   var ITEM_TAG = {
-    worst: ['かなり不運', 'var(--gold)'], bad: ['不運', 'var(--gold)'], slight: ['ちょい不運', 'var(--felt)'],
+    worst: ['かなり不運', 'var(--gold)'], bad: ['不運', 'var(--gold)'], slight: ['ちょい不運', 'var(--good)'],
     normal: ['普通', 'var(--flat)'], sekkyo: ['順当', 'var(--chip)']
   };
   function classLabel(h) {
@@ -1314,13 +1318,15 @@
     cardbar.hidden = false;
     cardbar.classList.add('visible');
   });
-  input.addEventListener('blur', function () {
+  function hideCardbar() {
     cardbar.hidden = true;
     cardbar.classList.remove('visible');
-  });
+  }
+  input.addEventListener('blur', hideCardbar);
   document.getElementById('cardbarBtn').addEventListener('pointerdown', function (e) { e.preventDefault(); });
   document.getElementById('cardbarBtn').addEventListener('click', function () {
     input.blur();
+    hideCardbar();
     setPicker(true);
   });
 
