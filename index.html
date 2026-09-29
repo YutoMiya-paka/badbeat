@@ -125,6 +125,15 @@
   .about-short { display: none; }
   .tone-btn { flex:none; font:inherit; font-size:12px; padding:5px 10px; border-radius:999px; border:1px solid color-mix(in srgb, var(--on-felt) 45%, transparent); background:transparent; color:var(--on-felt); cursor:pointer; white-space:nowrap; }
   .tone-long { display:inline; } .tone-short { display:none; }
+  .cardbar { display:none; gap:8px; align-items:center; padding:5px 16px; border-top:1px solid var(--line); background:var(--surface); }
+  .cardbar button { flex:none; min-height:32px; font:inherit; font-size:13px; font-weight:700; padding:4px 12px; border-radius:999px; border:1px solid var(--felt); background:var(--bg); color:var(--ink); cursor:pointer; }
+  .cardbar span { font-size:12px; color:var(--muted); }
+  .cardbar.visible { display:flex; }
+  .about-inner { position:relative; padding-top:54px; }
+  .about-x { position:absolute; top:6px; right:6px; width:44px; height:44px; padding:0; border:0; background:transparent; color:var(--ink); font-size:26px; line-height:1; cursor:pointer; }
+  .about details > summary { cursor:pointer; font-size:13px; font-weight:700; color:var(--blue); }
+  .about details[open] > summary { margin-bottom:8px; }
+  .eq-count { font-size:11px; color:var(--muted); text-align:right; }
   @media (max-width: 420px) { .about-short { display: inline; } .tone-long { display:none; } .tone-short { display:inline; } .top { gap:7px; padding-left:10px; padding-right:10px; } .tone-btn,.about-btn { padding:5px 7px; font-size:11px; } }
   .about-btn {
     flex: none;
@@ -149,7 +158,7 @@
     color: var(--ink);
   }
   .about::backdrop { background: rgb(0 0 0 / .45); }
-  .about-inner { padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 14px; }
+  .about-inner { padding: 54px 18px 16px; display: flex; flex-direction: column; gap: 14px; }
   .about h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 18px; }
   .about h3 { margin: 0 0 4px; font-size: 13px; letter-spacing: .06em; color: var(--muted); }
   .about p, .about ul { margin: 0; font-size: 14px; }
@@ -402,11 +411,11 @@
   }
   .seg button + button { border-left: 1px solid var(--line); }
   .seg button[aria-checked="true"] { background: var(--felt); color: var(--on-felt); }
-  .pk-ranks { display: grid; grid-template-columns: repeat(13, minmax(0, 1fr)); gap: 4px; }
+  .pk-ranks { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
   .pk-suits { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
   .key {
-    font-family: var(--mono); font-weight: 700; font-size: 15px;
-    padding: 8px 0;
+    font-family: var(--mono); font-weight: 700; font-size: 16px;
+    min-height: 40px; padding: 0;
     border-radius: 5px;
     border: 1px solid var(--line);
     background: var(--bg);
@@ -472,11 +481,13 @@
 
   @media (max-width: 420px) {
     .about-long { display: none; }
+    .top-text > p { display:none; }
+    .note, .trivia, .eq-label, .eq-count, .di-skip { font-size:13px; }
     .top h1 { font-size: 18px; }
     .v-title { font-size: 20px; }
     .tl-row { gap: 6px; }
-    .key { font-size: 13px; padding: 7px 0; }
-    .pk-ranks { gap: 3px; }
+    .key { font-size: 16px; min-height: 40px; padding: 0; }
+    .pk-ranks { gap: 4px; }
   }
 </style>
 </head>
@@ -488,12 +499,13 @@
       <h1>バッドビート相談所</h1>
       <p>負けたハンドを書けば、おやっさんが確率だけで判定する</p>
     </div>
-    <button type="button" class="tone-btn" id="toneToggle" aria-pressed="false"><span class="tone-long">口調：荒め</span><span class="tone-short">荒め</span></button>
+    <button type="button" class="tone-btn" id="toneToggle" aria-pressed="false"><span class="tone-long">口調：荒め</span><span class="tone-short">口調 荒め</span></button>
     <button type="button" class="about-btn" id="aboutOpen" aria-haspopup="dialog" aria-label="このページについて"><span class="about-long">このページについて</span><span class="about-short">説明</span></button>
   </header>
 
   <dialog class="about" id="about" aria-labelledby="aboutTitle">
     <div class="about-inner">
+      <button type="button" class="about-x" id="aboutX" aria-label="閉じる">×</button>
       <h2 id="aboutTitle">このページについて</h2>
       <section>
         <h3>計算の前提</h3>
@@ -565,13 +577,14 @@
   </section>
 
   <p class="log-notice" id="logNotice" hidden>
-    入力したチャットの内容は、読み取りの改善のためスプレッドシートに保存されます。名前などの個人情報は書かないでください。
+    <span id="logNoticeText">入力はスプレッドシートに保存。個人情報は書かないで</span>
     <button type="button" class="log-notice-more" id="logNoticeMore">詳しく</button>
   </p>
 
+  <div class="cardbar" id="cardbar" hidden><button type="button" id="cardbarBtn">カードで選ぶ</button><span>カード欄を開く</span></div>
   <form id="composer" class="composer" autocomplete="off">
     <button type="button" class="btn ghost" id="pickerToggle" aria-expanded="false" aria-controls="picker">カード</button>
-    <input id="msg" type="text" enterkeyhint="send" placeholder="例: AA vs KK、プリフロでオールイン" aria-label="負けたハンドを書く">
+    <input id="msg" type="text" enterkeyhint="send" placeholder="AA vs KK と書くか、カードで選ぶ" aria-label="負けたハンドを書く">
     <button type="submit" class="btn" id="send">送信</button>
   </form>
 </div>
@@ -600,8 +613,9 @@
     var g = gentle();
     toneButton.setAttribute('aria-pressed', String(g));
     toneButton.setAttribute('aria-label', '口調を切り替える。現在は' + (g ? 'やさしめ' : '荒め'));
-    toneButton.innerHTML = g ? '<span class="tone-long">口調：やさしめ</span><span class="tone-short">やさしめ</span>' : '<span class="tone-long">口調：荒め</span><span class="tone-short">荒め</span>';
+    toneButton.innerHTML = g ? '<span class="tone-long">口調：やさしめ</span><span class="tone-short">口調 やさしめ</span>' : '<span class="tone-long">口調：荒め</span><span class="tone-short">口調 荒め</span>';
     document.querySelector('.top-text p').textContent = g ? '負けたハンドを書くと、確率だけで判定します' : '負けたハンドを書けば、おやっさんが確率だけで判定する';
+    document.getElementById('logNoticeText').textContent = g ? '入力はスプレッドシートに保存されます。個人情報は書かないでください' : '入力はスプレッドシートに保存。個人情報は書かないで';
   }
   updateToneUI();
 
@@ -643,6 +657,16 @@
   function fill(tpl, d) { return tpl.replace(/\{(\w+)\}/g, function (_, k) { return d[k]; }); }
 
   function scrollEnd() { log.scrollTop = log.scrollHeight; }
+  function alignVerdict(row) {
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        if (row.offsetHeight > log.clientHeight) {
+          var lr = log.getBoundingClientRect(), rr = row.getBoundingClientRect();
+          log.scrollTop += rr.top - lr.top - 8;
+        } else scrollEnd();
+      });
+    });
+  }
   function addRow(who, html) {
     var row = document.createElement('div');
     row.className = 'row ' + who;
@@ -806,12 +830,13 @@
   function eqBlock(step, label) {
     var h = step.win * 100, t = step.tie * 100, v = step.lose * 100;
     return '<div class="eq">' +
-      '<div class="eq-label"><span>' + label + '</span><span>' + step.boards.toLocaleString() + '通りを計算</span></div>' +
+      '<div class="eq-label"><span>' + label + '</span></div>' +
       '<div class="bar" role="img" aria-label="自分 ' + pct(step.win) + '、相手 ' + pct(step.lose) + '">' +
         '<span class="h" style="width:' + h + '%"></span><span class="t" style="width:' + t + '%"></span><span class="v" style="width:' + v + '%"></span></div>' +
       '<div class="eq-nums"><span class="hn">自分 ' + pct(step.win) + '</span>' +
         (step.tie > 0.0005 ? '<span>引き分け ' + pct(step.tie) + '</span>' : '') +
-        '<span class="vn">相手 ' + pct(step.lose) + '</span></div></div>';
+        '<span class="vn">相手 ' + pct(step.lose) + '</span></div>' +
+      '<div class="eq-count">' + step.boards.toLocaleString() + '通りを計算</div></div>';
   }
 
   var SHORT = { 0: 'プリフロ', 3: 'フロップ', 4: 'ターン' };
@@ -915,10 +940,12 @@
       '</div>' +
       eqBlock(a, PE.STREET_NAMES[s.street] + 'でオールインした時点') +
       '<p class="v-line">' + line + '</p>' +
+      '<details class="verdict-details"' + (window.matchMedia('(max-width: 420px)').matches ? '' : ' open') + '><summary>くわしく見る</summary>' +
       factsBlock(res, key) +
       timelineBlock(res) +
       '<p class="trivia">' + pick(triviaPool) + '</p>' +
       (notes.length ? '<p class="note">' + notes.join('<br>') + '</p>' : '') +
+      '</details>' +
       '</div>';
   }
 
@@ -981,7 +1008,7 @@
       wait.querySelector('.bubble').innerHTML = gentle() ? '<p>計算中に問題が起きました。お手数ですが、もう一度お試しください。</p>' : '<p>計算中に止まった。もう一回送ってくれ。</p>';
       if (meta.log !== false) sendLog({ source: meta.source, text: meta.text, ok: false, error: 'calc_failed', parsed: parsed });
     }
-    scrollEnd();
+    alignVerdict(wait);
     setBusy(false);
   }
 
@@ -1235,7 +1262,7 @@
       wait.querySelector('.bubble').innerHTML = gentle() ? '<p>計算中に問題が起きました。お手数ですが、もう一度お試しください。</p>' : '<p>計算中に止まった。もう一回送ってくれ。</p>';
       sendLog({ source: d.source, text: d.text, ok: false, error: 'daily_failed' });
     }
-    scrollEnd();
+    alignVerdict(wait);
     setBusy(false);
   }
 
@@ -1258,19 +1285,26 @@
     toggle.setAttribute('aria-expanded', String(open));
     if (open) scrollEnd();
   }
-  // 自分で「カード」ボタンから閉じたら、そのあとはメッセージ欄をタップしても自動では開かない
-  var pickerClosedByUser = false;
   toggle.addEventListener('click', function () {
     var open = picker.hidden;
-    if (!open) pickerClosedByUser = true;
+    input.blur();
     setPicker(open);
   });
-  // メッセージ欄をタップしたら、カード選択の欄を出す
-  function openPickerOnTap() {
-    if (picker.hidden && !pickerClosedByUser) setPicker(true);
-  }
-  input.addEventListener('focus', openPickerOnTap);
-  input.addEventListener('click', openPickerOnTap);
+  var cardbar = document.getElementById('cardbar');
+  input.addEventListener('focus', function () {
+    if (!picker.hidden) setPicker(false);
+    cardbar.hidden = false;
+    cardbar.classList.add('visible');
+  });
+  input.addEventListener('blur', function () {
+    cardbar.hidden = true;
+    cardbar.classList.remove('visible');
+  });
+  document.getElementById('cardbarBtn').addEventListener('pointerdown', function (e) { e.preventDefault(); });
+  document.getElementById('cardbarBtn').addEventListener('click', function () {
+    input.blur();
+    setPicker(true);
+  });
 
   var ranksEl = document.getElementById('pkRanks');
   var suitsEl = document.getElementById('pkSuits');
@@ -1397,6 +1431,9 @@
   document.getElementById('aboutOpen').addEventListener('click', openAbout);
   document.getElementById('logNoticeMore').addEventListener('click', openAbout);
   document.getElementById('aboutClose').addEventListener('click', function () {
+    if (typeof about.close === 'function') about.close(); else about.removeAttribute('open');
+  });
+  document.getElementById('aboutX').addEventListener('click', function () {
     if (typeof about.close === 'function') about.close(); else about.removeAttribute('open');
   });
   about.addEventListener('click', function (e) { if (e.target === about) about.close(); });
