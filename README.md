@@ -8,3 +8,5 @@
 - `tools/test-apps-script.js` … 受け口の数式対策・上限判定のテスト（`node tools/test-apps-script.js`）
 - `tools/apps-script.gs` … 入力記録を Google スプレッドシートに貯める受け口（設置手順はファイル先頭）
 - `tools/serve.js` … 手元確認用サーバー（`node tools/serve.js`）
+
+書体: Dela Gothic One、Zen Kaku Gothic New、JetBrains Mono（いずれも Google Fonts 経由、SIL Open Font License 1.1）

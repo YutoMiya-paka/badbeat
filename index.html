@@ -541,15 +541,31 @@
       </section>
       <section>
         <h3>入力の記録（プライバシー）</h3>
+        <ul id="aboutLogOn">
+          <li>利用目的: 入力は、読み取りの改善と統計のために使います。</li>
+          <li>保存先: Google の Apps Script を通して、運営者の Google スプレッドシートに保存します。</li>
+          <li>保存する項目: 入力した文章（先頭 100 文字）・カード・判定結果・口調の種類とアプリの版・受け取った日時。このページから名前や端末の情報を送ることはありません。</li>
+          <li>保存期間: 1 年。過ぎたものは削除します。</li>
+          <li id="aboutDeleteHow" hidden>削除の依頼: ご意見フォームから、入力した日時と内容を書いて依頼してください。</li>
+        </ul>
         <ul>
-          <li id="aboutLogOn">入力は、読み取りの改善と統計のために、Google の Apps Script を通して運営者のスプレッドシートに保存します。保存するのは、入力した文章・カード・判定結果と、受け取った日時です。このページから名前や端末の情報を送ることはありません。</li>
           <li>入力欄に名前などの個人情報は書かないでください。</li>
-          <li>文字の表示に Google Fonts を使っているため、Google のサーバーへの通信があります。</li>
         </ul>
       </section>
+      <section>
+        <h3>外部への送信</h3>
+        <ul>
+          <li>Google Fonts（Google）: 文字の表示のため。IP アドレスなどの通信情報が送られます。</li>
+          <li id="aboutSendLog">Google Apps Script（Google）: 記録のため。上の「保存する項目」を送ります。</li>
+        </ul>
+      </section>
+      <section id="aboutOperator" hidden>
+        <h3>運営者</h3>
+        <p id="operatorName"></p>
+      </section>
       <section id="aboutFeedback" hidden>
-        <h3>ご意見・不具合の連絡</h3>
-        <p><a id="feedbackLink" href="#" target="_blank" rel="noopener">こちらから送れます</a></p>
+        <h3>ご意見・不具合の連絡・記録の削除の依頼</h3>
+        <p><a id="feedbackLink" href="#" target="_blank" rel="noopener">ご意見フォームから送れます</a></p>
       </section>
       <button type="button" class="btn about-close" id="aboutClose">閉じる</button>
     </div>
@@ -613,9 +629,10 @@
   'use strict';
   // ---------- 設定 ----------
   var CONFIG = {
-    APP_VERSION: '1.4.4',
+    APP_VERSION: '1.4.5',
     LOG_ENDPOINT: 'https://script.google.com/macros/s/AKfycbxIEZgditDueEGFRzdc2UGNL9YqSMDN3CsJ1S30ozdiyNqvGewb2i4SGiOZbyvL2klC/exec',   // Apps Script ウェブアプリの /exec URL。空なら記録を送らない
-    FEEDBACK_URL: '',   // ご意見の送り先（フォームなどの URL）。空なら表示しない
+    FEEDBACK_URL: '',   // ご意見・削除依頼の送り先（Google フォームの URL）。空なら表示しない
+    OPERATOR_NAME: '',  // 運営者のハンドル名。空なら表示しない（仮の文字を入れて公開しない）
     LOG_LIMIT: 50       // 1 タブあたりの送信上限
   };
 
@@ -1498,10 +1515,16 @@
   // ---------- このページについて ----------
   var about = document.getElementById('about');
   document.getElementById('aboutLogOn').hidden = !CONFIG.LOG_ENDPOINT;
+  document.getElementById('aboutSendLog').hidden = !CONFIG.LOG_ENDPOINT;
   document.getElementById('logNotice').hidden = !CONFIG.LOG_ENDPOINT;
   if (CONFIG.FEEDBACK_URL) {
     document.getElementById('feedbackLink').href = CONFIG.FEEDBACK_URL;
     document.getElementById('aboutFeedback').hidden = false;
+    document.getElementById('aboutDeleteHow').hidden = false;
+  }
+  if (CONFIG.OPERATOR_NAME) {
+    document.getElementById('operatorName').textContent = CONFIG.OPERATOR_NAME;
+    document.getElementById('aboutOperator').hidden = false;
   }
   function openAbout() {
     if (typeof about.showModal === 'function') about.showModal(); else about.setAttribute('open', '');

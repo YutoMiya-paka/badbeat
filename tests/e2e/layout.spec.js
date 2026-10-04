@@ -279,3 +279,38 @@ for (const scheme of ['light', 'dark']) {
     });
   });
 }
+
+// v1.4.5: プライバシーの表記（リスク管理の指摘 A）
+test('このページについて: 利用目的・保存項目・保存期間 1 年・外部への送信。運営者とフォームは未設定なら出さない', async ({ page }) => {
+  await openApp(page);
+  await page.locator('#aboutOpen').click();
+  const dlg = page.locator('#about');
+  await expect(dlg).toContainText('利用目的: 入力は、読み取りの改善と統計のために使います。');
+  await expect(dlg).toContainText('入力した文章（先頭 100 文字）');
+  await expect(dlg).toContainText('保存期間: 1 年。過ぎたものは削除します。');
+  await expect(dlg).toContainText('Google Fonts（Google）: 文字の表示のため。IP アドレスなどの通信情報が送られます。');
+  await expect(dlg).toContainText('Google Apps Script（Google）: 記録のため。');
+  await expect(dlg.locator('#aboutOperator')).toBeHidden();
+  await expect(dlg.locator('#aboutFeedback')).toBeHidden();
+  await expect(dlg.locator('#aboutDeleteHow')).toBeHidden();
+});
+
+test('このページについて: フォームの URL と運営者名を設定すると、連絡先・削除の依頼・運営者が出る', async ({ page }) => {
+  // 設定値だけを差し替えたページを返す（本番の index.html は変えない）
+  await page.route(url => new URL(url).pathname === '/', async route => {
+    const res = await route.fetch();
+    const html = (await res.text())
+      .replace("FEEDBACK_URL: ''", "FEEDBACK_URL: 'https://forms.gle/example-test'")
+      .replace("OPERATOR_NAME: ''", "OPERATOR_NAME: 'テスト運営者'");
+    await route.fulfill({ response: res, body: html });
+  });
+  await openApp(page);
+  await page.locator('#aboutOpen').click();
+  const dlg = page.locator('#about');
+  await expect(dlg.locator('#aboutOperator')).toBeVisible();
+  await expect(dlg.locator('#operatorName')).toHaveText('テスト運営者');
+  await expect(dlg.locator('#aboutFeedback')).toBeVisible();
+  await expect(dlg.locator('#feedbackLink')).toHaveAttribute('href', 'https://forms.gle/example-test');
+  await expect(dlg.locator('#feedbackLink')).toHaveAttribute('target', '_blank');
+  await expect(dlg.locator('#aboutDeleteHow')).toBeVisible();
+});
