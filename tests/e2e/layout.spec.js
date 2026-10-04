@@ -281,7 +281,7 @@ for (const scheme of ['light', 'dark']) {
 }
 
 // v1.4.5: プライバシーの表記（リスク管理の指摘 A）
-test('このページについて: 利用目的・保存項目・保存期間 1 年・外部への送信。運営者とフォームは未設定なら出さない', async ({ page }) => {
+test('このページについて: 利用目的・保存項目・保存期間 1 年・外部への送信。運営者 dotetan を表示し、フォームは未設定なら出さない', async ({ page }) => {
   await openApp(page);
   await page.locator('#aboutOpen').click();
   const dlg = page.locator('#about');
@@ -290,7 +290,8 @@ test('このページについて: 利用目的・保存項目・保存期間 1 
   await expect(dlg).toContainText('保存期間: 1 年。過ぎたものは削除します。');
   await expect(dlg).toContainText('Google Fonts（Google）: 文字の表示のため。IP アドレスなどの通信情報が送られます。');
   await expect(dlg).toContainText('Google Apps Script（Google）: 記録のため。');
-  await expect(dlg.locator('#aboutOperator')).toBeHidden();
+  // 運営者名は設定済み（dotetan）。フォームの URL は未設定なら出さない
+  await expect(dlg.locator('#operatorName')).toHaveText('dotetan');
   await expect(dlg.locator('#aboutFeedback')).toBeHidden();
   await expect(dlg.locator('#aboutDeleteHow')).toBeHidden();
 });
@@ -301,7 +302,7 @@ test('このページについて: フォームの URL と運営者名を設定�
     const res = await route.fetch();
     const html = (await res.text())
       .replace("FEEDBACK_URL: ''", "FEEDBACK_URL: 'https://forms.gle/example-test'")
-      .replace("OPERATOR_NAME: ''", "OPERATOR_NAME: 'テスト運営者'");
+      .replace(/OPERATOR_NAME: '[^']*'/, "OPERATOR_NAME: 'テスト運営者'");
     await route.fulfill({ response: res, body: html });
   });
   await openApp(page);
